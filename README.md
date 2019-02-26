@@ -1,2 +1,2 @@
-# opythn
-A compiler and bytecode interpreter for a subset of Python
+# OPythn
+OPythn is a compiler and bytecode interpreter for a core subset of Python.

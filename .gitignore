@@ -1,0 +1,30 @@
+# Ignore all
+*
+# Unignore all with extensions
+!*.*
+# Unignore all directories
+!*/
+# Unignore Makefile and OCaml _tags file
+!Makefile
+!_tags
+### ALL FILES WITHOUT EXTENSION NOW IGNORED ###
+
+# OS generated files #
+.DS_Store
+*.swp
+*.dSYM
+
+# Compiled source #
+*.out
+*.o
+*.hi
+*.d
+*.s
+*.cmi
+*.cmo
+*.cmx
+
+# LaTeX files #
+*.aux
+*.log
+*.gz
