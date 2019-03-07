@@ -9,6 +9,7 @@
 
 \begin{document}
  
+\date{February 26, 2019}
 \title{\textbf{NPRG045 Project Proposal: OPythn}}
 \author{Marcel Goh}
 \maketitle
@@ -20,7 +21,7 @@ The aim of this project is to create an interpreter for OPythn, a subset of the 
 The OPythn compiler and interpreter will support a sizable, functional subset of Python. This includes primitive types and their operations, named functions, lists, dictionaries, and classes. Features that can be implemented in terms of this base language will be provided as libraries, written in OPythn. If the timeline permits, OPythn can be extended to support more advanced constructions such as anonymous functions, list comprehensions, generators, and coroutines.
 
 \section{Implementation}
-The front-end the program will be written in OCaml. This consists of getting the user input, displaying program output, as well as functionality for lexing, parsing, and compiling the OPythn code. The lexing and parsing will be accomplished using \texttt{ocamllex} and \texttt{ocamlyacc}, unless more flexibility is required than those libraries can provide, in which case hand-written rules will be applied.\\
+The front-end of the program will be written in OCaml. This consists of getting the user input, displaying program output, as well as functionality for lexing, parsing, and compiling the OPythn code. The lexing and parsing will be accomplished using \texttt{ocamllex} and \texttt{ocamlyacc}, unless more flexibility is required than those libraries can provide, in which case hand-written rules will be applied.\\
 \indent The target bytecode will read by a virtual machine and for this step, we will consider writing certain functions in C and calling them into the OCaml code if necessary, via OCaml's interface with C. This may facilitate low-level operations on bitstrings, for instance. Designing the bytecode and virtual machine is a core part of the project. The virtual machine will be stack-based with typed data. The plan is to have one-byte instructions, which should allow a relatively wide instruction set. This means that different types of data can be handled by separate instructions. A significant advantage of writing the bytecode interpreter in OCaml (as opposed to switching to pure C for this step) will be that we can make use of OCaml's native garbage collector to manage OPythn's garbage collection.
 
 \section{Target Platforms}

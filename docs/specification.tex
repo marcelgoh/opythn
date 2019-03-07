@@ -1,0 +1,97 @@
+\documentclass[11pt, A4, twoside]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{fancyhdr, listings, color, titling}
+\pagestyle{fancy}
+\usepackage[shortlabels]{enumitem}
+\setlist{  
+  listparindent=\parindent,
+  parsep=0pt,
+}
+
+\lstset{
+    backgroundcolor=\color[rgb]{0.9,0.9,0.9},
+    language=python,
+    identifierstyle=\ttfamily,
+    keywordstyle=\color[rgb]{0,0,1}\ttfamily,
+    commentstyle=\color[rgb]{0.8, 0.4, 0.2}\ttfamily,
+    stringstyle=\color[rgb]{0.45,0.345,0.584}\ttfamily,
+}
+
+\setlength{\droptitle}{5em}
+
+\newcommand{\ms}{\texttt}
+
+\fancyhead[LE]{NPRG045}
+\fancyhead[RE]{Summer 2019}
+\fancyhead[LO]{Marcel Goh}
+\fancyhead[RO]{Project Specification: OPythn}
+\fancyfoot[LE]{\thepage}
+\fancyfoot[RO]{\thepage}
+\cfoot{}
+
+
+
+\begin{document}
+\title{\Huge{\textbf{NPRG045 Project Specification: OPythn}}}
+\author{\Large{Marcel Goh}}
+\clearpage\maketitle
+\thispagestyle{empty}
+\newpage
+\setcounter{page}{1}
+
+\section{Target}
+    The OPythn project aims to implement a working subset of the Python programming language by means of a bytecode compiler and interpreter, written in OCaml. Users will be able to interact with OPythn via a top-level read-eval-print loop or compile OPythn source code to bytecode. OPythn runs on macOS and Linux platforms.
+
+\section{Language}
+    The core of OPythn is designed to be lightweight and minimal. Basic types and operations, control structures, and elementary data structures are included, while more complex Python constructions, such as anonymous functions, list comprehensions, generators, and coroutines are omitted.
+    \subsection{Features}
+    OPythn inherits the following features directly from Python:
+    \begin{itemize}
+        \item Primitive types \ms{int}, \ms{float}, \ms{str}, and \ms{bool}
+        \item Arithmetic and boolean operators
+        \item Control structures \ms{if}, \ms{for}, and \ms{while}
+        \item Lists and dictionaries
+        \item Named functions
+        \item Classes and objects
+    \end{itemize}
+    To round out OPythn's standard library, other core functions will be defined in OPythn and included in the standard OPythn installation. These mainly consist of basic operations on mathematical objects, lists, and strings.
+    \subsection{Lexical Conventions}
+    The following are OPythn keywords and cannot be used in ordinary names:
+    \begin{center}
+        \begin{tabular}{cccccc}
+            \ms{int} & \ms{float} & \ms{str} & \ms{bool} & \ms{def} & \ms{return}\\
+            \ms{True} & \ms{False} & \ms{None} & \ms{and} & \ms{or} & \ms{not}\\
+            \ms{if} & \ms{elif} & \ms{else} & \ms{for} & \ms{in} & \ms{while}\\
+            \ms{break} & \ms{continue} & \ms{class} & \ms{is} & \ms{del} & \ms{import}\\
+            \ms{in} & \ms{from} & \ms{as} &&&
+    \end{tabular}
+    \end{center}
+
+   \subsection{Grammar}
+   This is the complete OPythn grammar specification:
+   \begin{lstlisting}[language=python]
+   # Start symbols
+   single_input: NEWLINE | simple_stmt | compound_stmt NEWLINE
+   file_input: (NEWLINE | stmt)* ENDMARKER
+
+   funcdef: 'def' NAME parameters ':' suite
+   parameters: '(' [arglist] ')'
+   arglist: arg (',' arg)*
+   arg: NAME
+
+   stmt: simple_stmt | compound_stmt
+   simple_stmt: small_stmt (';' small_stmt)* [';'] NEWLINE
+   small_stmt: (expr_stmt | del_stmt | flow_stmt | import_stmt)
+   expr
+   \end{lstlisting}
+
+
+\section{Implementation}
+The front-end the program will be written in OCaml. This consists of getting the user input, displaying program output, as well as functionality for lexing, parsing, and compiling the Python code. The lexing and parsing will be accomplished using \ms{ocamllex} and \ms{ocamlyacc}, unless more flexibility is required than those libraries can provide, in which case hand-written rules will be applied.\\
+\indent The target bytecode will read by a virtual machine and for this step, we will consider writing certain functions in C and calling them into the OCaml code if necessary, via OCaml's interface with C. This may facilitate low-level operations on bitstrings, for instance. Designing the bytecode and virtual machine is a core part of the project. The virtual machine will be stack-based with typed data. The plan is to have one-byte instructions, which should allow a relatively wide instruction set. This means that different types of data can be handled by separate instructions. A significant advantage of writing the bytecode interpreter in OCaml (as opposed to switching to pure C for this step) will be that we can make use of OCaml's native garbage collector to manage OPythn's garbage collection.
+
+\begin{thebibliography}{1}
+    \bibitem{pythonref} Guido van Rossum. \textit{The Python Language Reference}. Python Software Foundation, 2019.
+\end{thebibliography}
+
+\end{document}
