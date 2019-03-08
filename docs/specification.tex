@@ -1,6 +1,6 @@
-\documentclass[11pt, A4, twoside]{article}
+\documentclass[11pt, twoside]{article}
 \usepackage[margin=1in]{geometry}
-\usepackage{fancyhdr, listings, color, titling}
+\usepackage{fancyhdr, listings, color, titling, inconsolata}
 \pagestyle{fancy}
 \usepackage[shortlabels]{enumitem}
 \setlist{  
@@ -9,24 +9,22 @@
 }
 
 \lstset{
+    basicstyle=\ttfamily,
     backgroundcolor=\color[rgb]{0.9,0.9,0.9},
-    language=python,
-    identifierstyle=\ttfamily,
-    keywordstyle=\color[rgb]{0,0,1}\ttfamily,
-    commentstyle=\color[rgb]{0.8, 0.4, 0.2}\ttfamily,
-    stringstyle=\color[rgb]{0.45,0.345,0.584}\ttfamily,
+    keywordstyle=\color[rgb]{0,0,1},
+    commentstyle=\color[rgb]{0.8, 0.4, 0.2},
+    stringstyle=\color[rgb]{0.45,0.345,0.484},
 }
 
 \setlength{\droptitle}{5em}
+\setlength{\headheight}{14pt}
 
 \newcommand{\ms}{\texttt}
 
-\fancyhead[LE]{NPRG045}
-\fancyhead[RE]{Summer 2019}
+\fancyhead[RE]{NPRG045 Project Specification: OPythn}
+\fancyhead[LE]{\thepage}
 \fancyhead[LO]{Marcel Goh}
-\fancyhead[RO]{Project Specification: OPythn}
-\fancyfoot[LE]{\thepage}
-\fancyfoot[RO]{\thepage}
+\fancyhead[RO]{\thepage}
 \cfoot{}
 
 
@@ -40,7 +38,7 @@
 \setcounter{page}{1}
 
 \section{Target}
-    The OPythn project aims to implement a working subset of the Python programming language by means of a bytecode compiler and interpreter, written in OCaml. Users will be able to interact with OPythn via a top-level read-eval-print loop or compile OPythn source code to bytecode. OPythn runs on macOS and Linux platforms.
+    The OPythn project aims to implement a working subset of the Python programming language by means of a bytecode compiler and interpreter, written in OCaml. Users will be able to interact with OPythn via a top-level read-eval-print loop or compile OPythn source code to bytecode. OPythn will run on Unix operating systems, including macOS and Ubuntu.
 
 \section{Language}
     The core of OPythn is designed to be lightweight and minimal. Basic types and operations, control structures, and elementary data structures are included, while more complex Python constructions, such as anonymous functions, list comprehensions, generators, and coroutines are omitted.
@@ -66,29 +64,92 @@
             \ms{in} & \ms{from} & \ms{as} &&&
     \end{tabular}
     \end{center}
+    The rules that the lexer uses to recognise identifiers, numbers, and special characters are defined by the following regular expressions:
+    \begin{lstlisting}[language=python]
+    ENDMARKER: '\Z'
+    NAME: '[^\d\W]\w*'
+    NEWLINE: '\n'
+    NUMBER: '[+-]?((\d+\.\d*|\d*\.\d+)'
+    STRING: '(\"[^\n\"\\]\")|(\'[^\n\'\\]\')'
+    \end{lstlisting}
 
-   \subsection{Grammar}
-   This is the complete OPythn grammar specification:
-   \begin{lstlisting}[language=python]
-   # Start symbols
-   single_input: NEWLINE | simple_stmt | compound_stmt NEWLINE
-   file_input: (NEWLINE | stmt)* ENDMARKER
+    \subsection{Grammar}
+    This is the complete OPythn grammar specification:
+    \begin{lstlisting}[language=python]
+    # Start symbols
+    single_input: NEWLINE | simple_stmt | compound_stmt NEWLINE
+    file_input: (NEWLINE | stmt)* ENDMARKER
+    
+    funcdef: 'def' NAME parameters ':' suite
+    classdef: 'class' NAME ['(' [arglist] ')'] ':' suite
+    parameters: '(' [arglist] ')'
+    vararglist: arg (',' arg)*
+    arg: NAME
+    
+    stmt: simple_stmt | compound_stmt
+    simple_stmt: small_stmt (';' small_stmt)* [';'] NEWLINE
+    small_stmt: (expr_stmt | del_stmt | flow_stmt | import_stmt)
+    expr_stmt:  
+    compound_stmt: if_stmt | while_stmt | for_stmt | funcdef |
+        classdef
+    
+    # Control structures
+    if_stmt: 'if' test ':' suite ('elif' test ':' suite)*
+        ['else' ':' suite]
+    while_stmt: 'while' test ':' suite ['else' ':' suite]
+    for_stmt: 'for' exprlist 'in' testlist ':' suite
+        ['else' ':' suite]
+    
+    # Tests and expressions
+    test: or_test ['if' or_test 'else' test]
+    or_test: and_test ('or' and_test)*
+    and_test: not_test ('and' not_test)*
+    not_test: 'not' not_test | comparison
+    comparison: expr (comp_op expr)*
+    comp_op: '<'|'>'|'=='|'>='|'<='|'!='|'in'|'not' 'in'|
+        'is'|'is' 'not'
+    expr: xor_expr ('|' xor_expr)*
+    xor_expr: and_expr ('^' and_expr)*
+    and_expr: shift_expr ('&' shift_expr)*
+    shift_expr: arith_expr (('<<'|'>>') arith_expr)*
+    arith_expr: term (('+'|'-') term)*
+    term: factor (('*'|'/'|'%'|'//') factor)*
+    factor: ('+'|'-'|'~') factor | power
+    power: atom_expr ['**' factor]
+    atom_expr: atom trailer*
+    atom: (NAME | NUMBER | STRING+ | '...' | 'None' |
+        'True' | 'False')
+    trailer: '(' [arglist] ')' | '[' subscript ']' | . NAME
+    subscriptlist: subscript (',' subscript)* [',']
+    subscript: test | [test] ':' [test] [sliceop]
+    sliceop: ':' [test]
+    exprlist: expr (',' expr)* [',']
+    testlist: test (',' test)* [',']
+    dictorsetmaker: ( ((test ':' test | '**' expr)
+                       ((',' (test ':' test)* [','])) |
+                      (test (',' test)* [','])) )
+    arglist: argument (',' argument)* [',']
 
-   funcdef: 'def' NAME parameters ':' suite
-   parameters: '(' [arglist] ')'
-   arglist: arg (',' arg)*
-   arg: NAME
-
-   stmt: simple_stmt | compound_stmt
-   simple_stmt: small_stmt (';' small_stmt)* [';'] NEWLINE
-   small_stmt: (expr_stmt | del_stmt | flow_stmt | import_stmt)
-   expr
-   \end{lstlisting}
+    argument (test | test '=' test)
+    \end{lstlisting}
 
 
 \section{Implementation}
-The front-end the program will be written in OCaml. This consists of getting the user input, displaying program output, as well as functionality for lexing, parsing, and compiling the Python code. The lexing and parsing will be accomplished using \ms{ocamllex} and \ms{ocamlyacc}, unless more flexibility is required than those libraries can provide, in which case hand-written rules will be applied.\\
-\indent The target bytecode will read by a virtual machine and for this step, we will consider writing certain functions in C and calling them into the OCaml code if necessary, via OCaml's interface with C. This may facilitate low-level operations on bitstrings, for instance. Designing the bytecode and virtual machine is a core part of the project. The virtual machine will be stack-based with typed data. The plan is to have one-byte instructions, which should allow a relatively wide instruction set. This means that different types of data can be handled by separate instructions. A significant advantage of writing the bytecode interpreter in OCaml (as opposed to switching to pure C for this step) will be that we can make use of OCaml's native garbage collector to manage OPythn's garbage collection.
+Both the OPythn bytecode compiler and interpreter will be implemented in OCaml. This section gives a rough overview of the process by which OPythn source code is handled and executed.
+    \subsection{Input/Output}
+    The OPythn program can be run directly in a Unix terminal via the command \texttt{opythn}. When run without arguments, this command launches a read-eval-print loop into which the user can enter commands. In interactive mode, the interpreter evaluates a valid command as soon as it is received:
+    \begin{lstlisting}
+    OPythn (Interactive), version 0.0.0
+    :? for help, :q to quit
+    ]=> print("Hello, world!")
+    Hello, world!
+    \end{lstlisting}
+    Alternatively, OPythn source code can be defined in a separate \texttt{.opy} file and provided to the interpreter as a program argument. In this, mode, OPythn immediately compiles and interprets the source code directly.
+    \subsection{Lexical Analysis}
+    Upon reading source code, the OPythn front-end passes the data as a string to a series of functions that lex the code into tokens. The lexer will be created with the help of \texttt{ocamllex}, a program that generates a deterministic finite automaton in OCaml. This resulting lexer matches regular expressions in the string to convert chunks of characters into the correct tokens. 
+    \subsection{Parsing}
+    The tokens will then be fed into a parser, which will be created according to the grammar rules outlined in Section 2.3 and using \texttt{ocamlyacc}. The result will be an abstract syntax tree that represents the structure and semantics of the OPythn program. 
+
 
 \begin{thebibliography}{1}
     \bibitem{pythonref} Guido van Rossum. \textit{The Python Language Reference}. Python Software Foundation, 2019.
