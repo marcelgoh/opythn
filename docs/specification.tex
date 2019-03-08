@@ -148,7 +148,106 @@ Both the OPythn bytecode compiler and interpreter will be implemented in OCaml. 
     \subsection{Lexical Analysis}
     Upon reading source code, the OPythn front-end passes the data as a string to a series of functions that lex the code into tokens. The lexer will be created with the help of \texttt{ocamllex}, a program that generates a deterministic finite automaton in OCaml. This resulting lexer matches regular expressions in the string to convert chunks of characters into the correct tokens. 
     \subsection{Parsing}
-    The tokens will then be fed into a parser, which will be created according to the grammar rules outlined in Section 2.3 and using \texttt{ocamlyacc}. The result will be an abstract syntax tree that represents the structure and semantics of the OPythn program. 
+    The tokens produced by the lexer is then fed into the parser, which will be implemented according to the grammar rules outlined in Section 2.3 and using \texttt{ocamlyacc}, an OCaml parser generator. The result will be an abstract syntax tree that represents the structure and semantics of the OPythn program. 
+    \subsection{Bytecode}
+    OPythn evaluates an abstract syntax tree by generating intermediary bytecode, which is evaluated by a virtual stack machine, as in many conventional Python implementations. As an example of what this looks like, consider this simple algorithm for integer exponentiation:
+    \begin{lstlisting}[language=python]
+    x = int(input("Enter the multiplicand: "))
+    y = int(input("Enter the multiplier: "))
+
+    acc = 0
+    while y > 0:
+        if y % 2 == 0:
+            x *= 2
+            y //= 2
+        else:
+            acc += x
+            y -= 1
+
+    print("The product is: ", acc)
+    \end{lstlisting}
+    The disassembled output produced by the CPython interpreter looks like this:
+    \begin{lstlisting}
+      0 LOAD_NAME                0 (int)
+      2 LOAD_NAME                1 (input)
+      4 LOAD_CONST               0 ('Enter the multiplicand: ')
+      6 CALL_FUNCTION            1
+      8 CALL_FUNCTION            1
+     10 STORE_NAME               2 (x)
+
+     12 LOAD_NAME                0 (int)
+     14 LOAD_NAME                1 (input)
+     16 LOAD_CONST               1 ('Enter the multiplier: ')
+     18 CALL_FUNCTION            1
+     20 CALL_FUNCTION            1
+     22 STORE_NAME               3 (y)
+
+     24 LOAD_CONST               2 (0)
+     26 STORE_NAME               4 (acc)
+
+     28 SETUP_LOOP              58 (to 88)
+     30 LOAD_NAME                3 (y)
+     32 LOAD_CONST               2 (0)
+     34 COMPARE_OP               4 (>)
+     36 POP_JUMP_IF_FALSE       86
+
+     38 LOAD_NAME                3 (y)
+     40 LOAD_CONST               3 (2)
+     42 BINARY_MODULO
+     44 LOAD_CONST               2 (0)
+     46 COMPARE_OP               2 (==)
+     48 POP_JUMP_IF_FALSE       68
+
+     50 LOAD_NAME                2 (x)
+     52 LOAD_CONST               3 (2)
+     54 INPLACE_MULTIPLY
+     56 STORE_NAME               2 (x)
+
+     58 LOAD_NAME                3 (y)
+     60 LOAD_CONST               3 (2)
+     62 INPLACE_FLOOR_DIVIDE
+     64 STORE_NAME               3 (y)
+     66 JUMP_ABSOLUTE           30
+
+     68 LOAD_NAME                4 (acc)
+     70 LOAD_NAME                2 (x)
+     72 INPLACE_ADD
+     74 STORE_NAME               4 (acc)
+
+     76 LOAD_NAME                3 (y)
+     78 LOAD_CONST               4 (1)
+     80 INPLACE_SUBTRACT
+     82 STORE_NAME               3 (y)
+     84 JUMP_ABSOLUTE           30
+     86 POP_BLOCK
+
+     88 LOAD_NAME                5 (print)
+     90 LOAD_CONST               5 ('The product is: ')
+     92 LOAD_NAME                4 (acc)
+     94 CALL_FUNCTION            2
+     96 POP_TOP
+     98 LOAD_CONST               6 (None)
+    100 RETURN_VALUE
+    \end{lstlisting}
+    OPythn compiled source will look largely the same, but will not be converted into bitstrings. Instead, an \texttt{instr} datatype will be used to capture the same information as a single two-byte bytecode instruction.
+    \begin{lstlisting}[language=caml]
+        type instr =
+          LOAD_NAME of int
+        | LOAD_CONST of int
+        (* ... *)
+        | RETURN_VALUE
+    \end{lstlisting}
+    The advantage of this representation is that the interpreter can easily pattern-match on instruction tags. When expressed in this way, the above bytecode would be represented as the following \texttt{instr array}.
+    \begin{lstlisting}[language=caml]
+    [| LOAD_NAME 0;
+       LOAD_NAME 1;
+       LOAD_CONST 0;
+       CALL_FUNCTION 1;
+       CALL_FUNCTION 1;
+       STORE_NAME 2;
+       (* ... *)
+       RETURN_VALUE |]
+    \end{lstlisting}
 
 
 \begin{thebibliography}{1}
