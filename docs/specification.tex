@@ -11,9 +11,10 @@
 \lstset{
     basicstyle=\ttfamily,
     backgroundcolor=\color[rgb]{0.9,0.9,0.9},
-    keywordstyle=\color[rgb]{0,0,1},
+    keywordstyle=\color[rgb]{0.97,0,0.369},
     commentstyle=\color[rgb]{0.8, 0.4, 0.2},
     stringstyle=\color[rgb]{0.45,0.345,0.484},
+    showstringspaces=false,
 }
 
 \setlength{\droptitle}{5em}
@@ -229,7 +230,7 @@ Both the OPythn bytecode compiler and interpreter will be implemented in OCaml. 
      98 LOAD_CONST               6 (None)
     100 RETURN_VALUE
     \end{lstlisting}
-    OPythn compiled source will look largely the same, but will not be converted into bitstrings. Instead, an \texttt{instr} datatype will be used to capture the same information as a single two-byte bytecode instruction.
+    OPythn compiled source will look largely the same, but will not be converted into bitstrings. Instead, an \texttt{instr} datatype will be used to capture the same information as CPython's two-byte instructions. A different type tag will be used for each bytecode instruction.
     \begin{lstlisting}[language=caml]
         type instr =
           LOAD_NAME of int
@@ -248,6 +249,11 @@ Both the OPythn bytecode compiler and interpreter will be implemented in OCaml. 
        (* ... *)
        RETURN_VALUE |]
     \end{lstlisting}
+    \subsection{Virtual Machine}
+    Finally, the bytecode is interpreted by a stack-based virtual machine that produces the desired output. We can define a datatype specifically for stack items, so that any sort of data can be at the top of the stack. Then the stack can be represented as an \texttt{item list}, because we will only ever have to access the first few elements in the (linked) list. Many bytecode instructions access and manipulate the stack directly. For example, the instruction \texttt{POP\_TOP} removes the top element of the stack.\\
+    \indent Additionally, the interpreter has access to an array of names and and array of constants, both of which were created upon code generation. For example, the instruction \texttt{LOAD\_NAME 1} accesses the name array at index 1 and pushes the associated object onto the stack; in our case above, this was the function \texttt{input}. Likewise, the instruction \texttt{LOAD\_CONST 5} accesses the constant array at the index 5 and pushes its value onto the stack.\\
+    \indent Control-flow logic is implemented using the stack using certain instructions that tell the interpreter to jump to other parts of the bytecode. For example, at line 46 of the example bytecode, the top two elements on the stack are the values \texttt{0} and \texttt{y \% 2}. The \texttt{COMPARE\_OP 2} instruction checks if the top two elements of the stack are equal, and then pushes a boolean value onto the stack. The next instruction, \texttt{POP\_JUMP\_IF\_FALSE 68}, pops this boolean off the stack and jumps to line 68 if the boolean was false. Loops are implemented in a similar way. The instruction \texttt{SETUP\_LOOP} \textit{n} designates the next \textit{n} instructions as a block, and a test has to be run every loop to determine if the block should be exited via a \texttt{JUMP} instruction.\\
+    \indent The evaluation procedure is performed by a recursive function \texttt{eval : int -> item list -> int}, in a context where the instruction, name, and constant arrays are defined. The \texttt{eval} function has as its inputs a line number and the current stack, and each time it is called, it performs the appropriate stack manipulations before calling itself again with the next line to evaluate. When \texttt{eval} runs out of instructions to evaluate (i.e. reaches the last instruction in the array with no \texttt{JUMP} command), the program halts and an exit code is returned.
 
 
 \begin{thebibliography}{1}
