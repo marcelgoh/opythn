@@ -182,7 +182,7 @@ Both the OPythn bytecode compiler and interpreter will be implemented in OCaml. 
     \subsection{Parsing}
     The tokens produced by the lexer is then fed into the parser, which will be implemented according to the grammar rules outlined in Section 2.3 and using \texttt{ocamlyacc}, an OCaml parser generator. The result will be an abstract syntax tree that represents the structure and semantics of the OPythn program. 
     \subsection{Bytecode}
-    OPythn evaluates an abstract syntax tree by generating intermediary bytecode, which is evaluated by a virtual stack machine, as in many conventional Python implementations. As an example of what this looks like, consider this simple algorithm for integer exponentiation:
+    OPythn evaluates an abstract syntax tree by generating intermediary bytecode, which is evaluated by a virtual stack machine, as in many conventional Python implementations. As an example of what this looks like, consider this simple algorithm for integer multiplication in terms of addition:
     \begin{lstlisting}[language=python]
     x = int(input("Enter the multiplicand: "))
     y = int(input("Enter the multiplier: "))
