@@ -14,6 +14,9 @@
 *.swp
 *.dSYM
 
+# OCaml working directory #
+_build/
+
 # Compiled source #
 *.out
 *.o
