@@ -1,29 +1,15 @@
 (* OPythn main front-end *)
 
-open Printf
-
-(* opens the specified file and outputs its contents as a string *)
-let str_from_filename filename =
-  try
-    let ch = open_in filename in
-    let size = in_channel_length ch in
-    let str = really_input_string ch size in
-    close_in ch;
-    Some str
-  with e -> None
+open Resizable
 
 let main () =
-  if Array.length Sys.argv < 2 then
-    printf "A file must be passed as input.\n"
-  else
-    let filename = Sys.argv.(1) in
-    let len = String.length filename in
-    if Filename.extension filename <> ".opy" then
-      printf "File extension not supported.\n"
-    else
-      let contents = str_from_filename filename in
-      match contents with
-      Some s -> printf "%s" s
-      | None -> printf "Failed to get text from file."
+  let arr = create_fill 4 "four" in
+  let empty = create_empty () in
+  Printf.printf "%d %d\n" (capacity arr) (capacity empty);
+  Printf.printf "%s %s %s %s\n" (get arr 0) (get arr 1) (get arr 2) (get arr 3);
+  set arr 2 "three";
+  set arr 1 "two";
+  set arr 0 "one";
+  Printf.printf "%s %s %s %s\n" (get arr (-4)) (get arr (-3)) (get arr (-2)) (get arr (-1))
 
 let _ = main ()

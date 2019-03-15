@@ -1,6 +1,8 @@
 \documentclass[11pt, twoside]{article}
 \usepackage[margin=1in]{geometry}
-\usepackage{fancyhdr, listings, color, titling, inconsolata}
+\usepackage[T1]{fontenc}
+\usepackage{fancyhdr, listings, color, titling, inconsolata, textcomp, algorithm}
+\usepackage{algpseudocode}
 \pagestyle{fancy}
 \usepackage[shortlabels]{enumitem}
 \setlist{  
@@ -15,12 +17,15 @@
     commentstyle=\color[rgb]{0.8, 0.4, 0.2},
     stringstyle=\color[rgb]{0.45,0.345,0.484},
     showstringspaces=false,
+    upquote=true
 }
+
 
 \setlength{\droptitle}{5em}
 \setlength{\headheight}{14pt}
 
 \newcommand{\ms}{\texttt}
+\newcommand{\sq}{\textquotesingle}
 
 \fancyhead[RE]{NPRG045 Project Specification: OPythn}
 \fancyhead[LE]{\thepage}
@@ -38,8 +43,107 @@
 \newpage
 \setcounter{page}{1}
 
-\section{Target}
+% INTRODUCTION
+\section{Introduction}
     The OPythn project aims to implement a working subset of the Python programming language by means of a bytecode compiler and interpreter, written in OCaml. Users will be able to interact with OPythn via a top-level read-eval-print loop or compile OPythn source code to bytecode. OPythn will run on Unix operating systems, including macOS and Ubuntu.
+
+% LEXICAL CONVENTIONS
+\section{Lexical Conventions}
+    OPythn reads source code as ASCII characters, which are fed into a lexer. This section describes how the tokenises source code input.
+    \subsection {Line and block structure}
+    The end of a line is represented by the \ms{NEWLINE} token. In general, simple statements cannot be split over multiple lines. However, an expression in parentheses, square brackets, or curly braces can be written over multiple lines without ending the statement. The \ms{\#} character can be used to indicate comments in source code. Any letters from \ms{\#} to the end of the line will be ignored by the lexer. A line that contains only whitespaces or comments is ignored except during interactive evaluation, when a blank line is used to indicate the end of a multi-line statement.\\
+    \indent In OPythn, the amount of leading whitespace at the beginning of a line indicates the indentation level of the line. A tab character counts for exactly four spaces during this computation. Indentation levels of consecutive lines are used to generate \ms{INDENT} and \ms{DEDENT} tokens. This is done by means of a stack using the following algorithm, as described by the standard Python reference \cite{pythonref}.
+    \begin{algorithm}
+    \caption{Insertion of \ms{INDENT} and \ms{DEDENT} tokens (as part of general lexing procedure)}
+    \begin{algorithmic}[1]
+    \Procedure{lex}{OPythn source code}
+        \State $token\_list \gets$ create a new empty list
+        \State $stack \gets$ create a new empty stack
+        \State $stack.push(0)$
+        \While{there are lines to be read}
+            \State $line \gets$ the current line
+            \State $num\_sp \gets$ the number of leading spaces in $line$
+            \If{$curr > stack.peek()$}
+                $stack.push(curr)$
+                $token\_list.add(\ms{INDENT})$
+            \ElsIf{$curr < stack.peek()$}
+                \State $count\gets 0$
+                \While{$curr < stack.peek()$}
+                    \State $stack.pop()$
+                    \State $count\gets count + 1$
+                \EndWhile
+                \For{$i\gets 0$, $count$}
+                    \State $token\_list.add(\ms{DEDENT})$
+                \EndFor
+                \EndIf
+                \State tokenise the rest of the line and add tokens to $token\_list$
+                \algstore{indent}
+    \end{algorithmic}
+    \end{algorithm}
+    \begin{algorithm}
+    \begin{algorithmic}
+            \algrestore{indent}
+        \EndWhile
+        \State \Return{$token\_list$}
+    \EndProcedure
+    \end{algorithmic}
+    \end{algorithm}
+
+    \subsection{Keywords and identifiers}
+    The following are OPythn keywords and cannot be used in ordinary identifiers:
+    \begin{center}
+        \begin{tabular}{cccccc}
+            \ms{int} & \ms{float} & \ms{str} & \ms{bool} & \ms{def} & \ms{return}\\
+            \ms{True} & \ms{False} & \ms{None} & \ms{and} & \ms{or} & \ms{not}\\
+            \ms{if} & \ms{elif} & \ms{else} & \ms{for} & \ms{in} & \ms{while}\\
+            \ms{break} & \ms{continue} & \ms{class} & \ms{is} & \ms{del} & \ms{import}\\
+            \ms{in} & \ms{from} & \ms{as} &\ms{global} & \ms{nonlocal} &
+    \end{tabular}
+    \end{center}
+    Any string that is not a keyword and contains uppercase and lowercase letters, underscores, and (except for the first character) numbers is a valid identifier. Case is significant. Some names are reserved for use by the standard library, which is described in Section 3.
+    \subsection{Literals}
+    Strings are enclosed in matching single quotes or double quotes. Triple-quoted strings are not supported, nor are formatted string literals. The backslash character \ms{\textbackslash} is used to escape characters that normally have a special meaning.
+    \begin{lstlisting}[language=python]
+    string: "'" stringitem* "'" | '"' stringitem '"'
+    stringitem: stringchar | stringescapeseq
+    stringchar: <source character besides '\\', '\n', "'", '"'>
+    stringescapeseq: '\\' <source character>
+    \end{lstlisting}
+    \indent There are two types of numeric literals in OPythn: integers and floating-point numbers. Leading zeroes in a non-zero decimal are not allowed. Underscores are also not allowed in numeric literals, unlike in Python 3.
+    \begin{lstlisting}[language=python]
+    integer: decinteger | bininteger | octinteger | hexinteger
+    decinteger: nonzerodigit digit* | '0'+
+    bininteger: '0' ('b'|'B') bindigit+
+    octinteger: '0' ('o'|'O') octdigit+
+    hexinteger: '0' ('x'|'X') hexdigit+
+    nonzerodigit: '1'...'9'
+    digit: '0'...'9'
+    bindigit: '0' | '1'
+    octdigit: '0'...'7'
+    hexdigit: digit | 'a'...'f' | 'A'...'F'
+
+    floatnumber: pointfloat | exponentfloat
+    pointfloat: [digit+] fraction | digit+ '.'
+    exponentfloat: (digit+ | pointfloat) exponent
+    fraction: '.' digit+
+    exponent: ('e'|'E') ['+' | '-'] digit+
+    \end{lstlisting}
+    \subsection{Operators and delimiters}
+    All operators and delimiters are inherited from standard Python except the \ms{@} and \ms{@=} symbols. (They are used for matrix multiplication and decorators, both of which are not features of OPythn.)
+    \subsection{Token representation}
+    The lexer will produce tokens of the following OCaml datatype:
+    \begin{lstlisting}[language=caml]
+    type token =
+      NEWLINE | INDENT | DEDENT
+    | NAME of string  (* identifier *)
+    | KWORD of string
+    | NUMBER of string
+    | STRING of string
+    | OP of string
+    | DELIM of string
+    \end{lstlisting}
+
+% LANGUAGE
 \section{Language}
     The core of OPythn is designed to be lightweight and minimal. Basic types and operations, control structures, and elementary data structures are included, while more complex Python constructions, such as anonymous functions, list comprehensions, generators, and coroutines are omitted.
     \subsection{Features}
@@ -52,7 +156,7 @@
         \item Named functions
         \item Classes and objects
     \end{itemize}
-    OPythn integers can be between -4,611,686,018,427,387,904 and -4,611,686,018,427,387,904 inclusive. Ordinary arithmetic operators for addition, multiplication, subtraction, division, modulus, and exponentiation are supported between types \ms{int} and \ms{float}. Additionally, OPythn supports the bitwise operations \ms{|}, \ms{\^}, \ms{\&}, \ms{<<}, \ms{>>}, and \ms{\~} on integers. Boolean values can be compared using the operators \ms{<}, \ms{<=}, \ms{>}, \ms{>=}, \ms{==}, \ms{!=}, \ms{is}, and \ms{is not}. Any object can be tested for truth value. The objects \ms{None}, \ms{False}, \ms{0}, \ms{0.0}, \ms{''}, \ms{[]}, and \ms{\string{\string}} are considered false; any other object is considered true.\\
+    OPythn integers can be between -4,611,686,018,427,387,904 and 4,611,686,018,427,387,903 inclusive. Ordinary arithmetic operators for addition, multiplication, subtraction, division, modulus, and exponentiation are supported between types \ms{int} and \ms{float}. Additionally, OPythn supports the bitwise operations \ms{|}, \ms{\^}, \ms{\&}, \ms{<<}, \ms{>>}, and \ms{\~} on integers. Boolean values can be compared using the operators \ms{<}, \ms{<=}, \ms{>}, \ms{>=}, \ms{==}, \ms{!=}, \ms{is}, and \ms{is not}. Any object can be tested for truth value. The objects \ms{None}, \ms{False}, \ms{0}, \ms{0.0}, \ms{''}, \ms{[]}, and \ms{\string{\string}} are considered false; any other object is considered true.\\
     \indent OPythn lists are zero-indexed resizing arrays and accessing an element takes constant time. Slice operations are supported. For example, if \ms{a = [1,2,3,4,5]}, then \ms{a[1:3]} would give the list \ms{[2,3]}. However, the Python \ms{slice} function (and associated object) is not supported. \\
     \indent OPythn supports higher-order functions and nested functions. In OPythn, functions cannot use or modify variables outside their scope, unless one of the keywords \ms{global} or \ms{nonlocal} is used. Nested classes and multiple inheritance are not supported at all. In addition, OPythn does not support private variables. In general, functions outside a class can mutate the class' variables or methods. Exceptions are not a feature of OPythn. When an error occurs, the program terminates/returns to the REPL with an error message and a stack trace is printed.\\
     \indent The following functions comprise OPythn's standard library and are included in a normal installation. Some of these functions are implemented in OPythn itself while others are implemented in OCaml.
@@ -63,42 +167,25 @@
             \ms{isinstance()} & \ms{issubclass()} & \ms{iter()} & \ms{len()} & \ms{map()} & \ms{max()}\\
             \ms{min()} & \ms{next()} & \ms{oct()} & \ms{open()} & \ms{ord()} & \ms{pow()}\\
             \ms{print()} & \ms{range()} & \ms{repr()} & \ms{reversed()} & \ms{round()} & \ms{sorted()}\\
-            \ms{str()} & \ms{sum()} & \ms{type()} &&&
+            \ms{str()} & \ms{sum()} & \ms{super()} & \ms{type()} &&
     \end{tabular}
     \end{center}
 
-    \subsection{Lexical Conventions}
-    The following are OPythn keywords and cannot be used in ordinary names:
-    \begin{center}
-        \begin{tabular}{cccccc}
-            \ms{int} & \ms{float} & \ms{str} & \ms{bool} & \ms{def} & \ms{return}\\
-            \ms{True} & \ms{False} & \ms{None} & \ms{and} & \ms{or} & \ms{not}\\
-            \ms{if} & \ms{elif} & \ms{else} & \ms{for} & \ms{in} & \ms{while}\\
-            \ms{break} & \ms{continue} & \ms{class} & \ms{is} & \ms{del} & \ms{import}\\
-            \ms{in} & \ms{from} & \ms{as} &\ms{global} & \ms{nonlocal} &
-    \end{tabular}
-    \end{center}
-    The \ms{\#} character can be used to indicate comments in source code. Any letters from \ms{\#} to the end of the line will be ignored. The rules that the lexer uses to recognise identifiers, numbers, and special characters are defined by the following regular expressions:
-    \begin{lstlisting}[language=python]
-    ENDMARKER: '\Z'
-    NAME: '[^\d\W]\w*'
-    NEWLINE: '\n'
-    NUMBER: '[+-]?((\d+\.\d*|\d*\.\d+)'
-    STRING: '(\"[^\n\"\\]\")|(\'[^\n\'\\]\')'
-    \end{lstlisting}
-    \subsection{Representation}
+    \subsection{Type representation}
     OPythn primitive types will be represented in OCaml with a datatype definition.
     \begin{lstlisting}[language=caml]
+    (* primitive types and tuples, which are immutable *)
     type py_prim =
       INT of int
     | FLOAT of float
     | STR of string
     | BOOL of bool
+    | TUPLE of py_val array
     \end{lstlisting}
-    We can have a separate type for OPythn compound types and then a general \ms{py\_val} type to capture both of these possibilities. OPythn lists can have elements of different types, making \ms{py\_val array} a natural representation. To represent a dictionary, we use an OCaml hashtable.
+    We can have a separate type for OPythn compound types and then a general \ms{py\_val} type to capture both of these possibilities. To represent an OPythn list, we will need to create a resizing array type in OCaml. To represent a dictionary, we use an OCaml hashtable.
     \begin{lstlisting}[language=caml]
     type py_comp =
-      LIST of py_val array
+      LIST of py_val Resizable.t (* dynamic array type *)
     | DICT of (py_prim, py_val) Hashtbl.t
     and type py_val =
       PRIM of py_prim
@@ -168,7 +255,7 @@
     argument (test | test '=' test)
     \end{lstlisting}
 
-
+% IMPLEMENTATION
 \section{Implementation}
 Both the OPythn bytecode compiler and interpreter will be implemented in OCaml. This section gives a rough overview of the process by which OPythn source code is handled and executed.
     \subsection{Input/Output}
@@ -176,7 +263,7 @@ Both the OPythn bytecode compiler and interpreter will be implemented in OCaml. 
     \begin{lstlisting}
     OPythn (Interactive), version 0.0.0
     :? for help, :q to quit
-    ]=> print("Hello, world!")
+    ]=> print('Hello, world!')
     Hello, world!
     \end{lstlisting}
     Alternatively, OPythn source code can be defined in a separate \texttt{.opy} file and provided to the interpreter as a program argument. In this, mode, OPythn immediately compiles and interprets the source code directly.
@@ -187,8 +274,8 @@ Both the OPythn bytecode compiler and interpreter will be implemented in OCaml. 
     \subsection{Bytecode}
     OPythn evaluates an abstract syntax tree by generating intermediary bytecode, which is evaluated by a virtual stack machine, as in many conventional Python implementations. As an example of what this looks like, consider this simple algorithm for integer multiplication in terms of addition:
     \begin{lstlisting}[language=python]
-    x = int(input("Enter the multiplicand: "))
-    y = int(input("Enter the multiplier: "))
+    x = int(input('Enter the multiplicand: '))
+    y = int(input('Enter the multiplier: '))
 
     acc = 0
     while y > 0:
@@ -199,7 +286,7 @@ Both the OPythn bytecode compiler and interpreter will be implemented in OCaml. 
             acc += x
             y -= 1
 
-    print("The product is: ", acc)
+    print('The product is: ', acc)
     \end{lstlisting}
     The disassembled output produced by the CPython interpreter looks like this:
     \begin{lstlisting}
