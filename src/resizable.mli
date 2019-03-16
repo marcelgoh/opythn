@@ -1,12 +1,12 @@
 (* Resizable array used to represent OPythn lists *)
 
-type 'a t = {
-  mutable arr : 'a array;
-  mutable size : int;
-}
+type 'a t
 
 exception Index_error of int * string
 exception Value_error of string
+
+(* number of elements in resizable array *)
+val size : 'a t -> int
 
 (* capacity of the current underlying array *)
 val capacity : 'a t -> int
@@ -29,5 +29,14 @@ val insert : 'a t -> int -> 'a -> unit
 (* remove elements from indices lo (inclusive) to hi (exclusive) *)
 val remove_in_range : 'a t -> int -> int -> unit
 
+(* remove element at specified index *)
+val remove : 'a t -> int -> unit
+
 (* find element e and remove it from the list *)
 val find_remove : 'a t -> 'a -> unit
+
+(* append single element at the end *)
+val append : 'a t -> 'a -> unit
+
+(* extend first list by appending second list at the end *)
+val extend : 'a t -> 'a t -> unit

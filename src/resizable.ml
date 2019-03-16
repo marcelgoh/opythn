@@ -8,8 +8,16 @@ type 'a t = {
 exception Index_error of int * string
 exception Value_error of string
 
+(* number of elements in resizable array *)
+let size r = r.size
+
 (* capacity of the current underlying array *)
 let capacity r = Array.length r.arr
+
+(* makes capacity bigger *)
+let enlarge_cap c =
+  let double = 2 * c in
+  if double > 10 then double else 10
 
 (* get positive version of index *)
 let pos_index r idx = if idx < 0 then idx + r.size else idx
@@ -65,8 +73,7 @@ let insert r idx e =
   else
     let pos_idx = pos_index r idx in
     if r.size == capacity r then
-      let doublecap = 2 * r.size in
-      let newcap = if doublecap < 10 then 10 else doublecap in
+      let newcap = enlarge_cap r.size in
       grow r e newcap; (* uses e as a dummy element to grow list *)
     (* loop through elements after index, shifting them one to the right *)
     let i = ref (r.size - 1) in
@@ -85,8 +92,11 @@ let remove_in_range r lo hi =
     Array.set r.arr i (Array.get r.arr (i + diff))
   done;
   r.size <- r.size - diff;
-  if r.size < ((capacity r) / 2) then
+  if r.size < ((capacity r) / 3) then
     shrink r
+
+(* remove element at specified index *)
+let remove r idx = remove_in_range r idx (idx + 1)
 
 (* find element e and remove it from the list *)
 let find_remove r e =
@@ -99,10 +109,24 @@ let find_remove r e =
           Array.set r.arr j (Array.get r.arr (j + 1))
         done;
         r.size <- r.size - 1;
-        if r.size < ((capacity r) / 2) then shrink r;
+        if r.size < ((capacity r) / 3) then shrink r;
         ignore (raise (M.Break i))
       end
     done;
     raise (Value_error "find_remove")
   with M.Break i -> ()
 
+(* append single element at the end *)
+let append r e =
+  if r.size = (capacity r) then begin
+    let newcap = enlarge_cap r.size in
+    grow r e newcap
+  end;
+  Array.set r.arr r.size e;
+  r.size <- r.size + 1
+
+(* extend first list by appending second list at the end *)
+let extend l1 l2 =
+  for i = 0 to l2.size - 1 do
+    append l1 (get l2 i)
+  done
