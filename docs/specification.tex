@@ -130,50 +130,17 @@
     \end{lstlisting}
     \subsection{Operators and delimiters}
     All symbolic operators and delimiters are inherited from standard Python except the \ms{@} and \ms{@=} symbols. (They are used for matrix multiplication and decorators, both of which are not features of OPythn.)
-    \subsection{Token representation}
-    The lexer will produce tokens of the following OCaml datatype:
-    \begin{lstlisting}[language=caml]
-    type token =
-      NEWLINE | INDENT | DEDENT
-    | NAME of string  (* identifier *)
-    | KWORD of string
-    | NUMBER of string
-    | STRING of string
-    | OP of string
-    | DELIM of string
-    \end{lstlisting}
 
 % LANGUAGE
 \section{Language}
     The core of OPythn is designed to be lightweight and minimal. Basic types and operations, control structures, and elementary data structures are included, while more complex Python constructions, such as list comprehensions, generators, and coroutines are omitted.
     \subsection{Simple and compound types}
     Every value in OPythn is of a certain type. There are four primitive types (\ms{int}, \ms{float}, \ms{str}, and \ms{bool}) and all of them are immutable. Integers are represented with 63 bits and can range between -4,611,686,018,427,387,904 and 4,611,686,018,427,387,903 inclusive. Strings contain 8-bit characters.\\
-    \indent OPythn has three compound types: \ms{list}, \ms{dict}, and \ms{tuple}. Of these, only tuples are immutable. Lists are zero-indexed and accessing an element via its index takes constant time. Dictionaries support values of different types, with the restriction that keys must be of an primitive type or \ms{NoneType}. For example, \ms{d = \{2: 'bonjour', False: 3.3\}} is a valid OPythn dictionary.\\
-    \indent Typed values are represented as follows:
-    \begin{lstlisting}[language=caml]
-    type py_prim =
-      INT of int
-    | FLOAT of float
-    | STR of string
-    | BOOL of bool
-    | NONE
-    \end{lstlisting}
-    There will be a separate type for OPythn compound types and then a general \ms{py\_val} type to capture both of these possibilities. To represent an OPythn list, we will need to create a resizing array type in OCaml. To represent a dictionary, we use an OCaml hashtable.
-    \begin{lstlisting}[language=caml]
-    type py_comp =
-      LIST of py_val Resizable.t (* dynamic array type *)
-    | DICT of (py_immut, py_val) Hashtbl.t
-    | TUPLE of py_val array
-    | TYPE of ...
-    | FUN of ...
-    | OBJ of ...
-    and type py_val =
-      IMMUT of py_prim
-    | MUT of py_comp
-    \end{lstlisting}
-
+    \indent OPythn has three compound types: \ms{list}, \ms{dict}, and \ms{tuple}. Of these, only tuples are immutable. Lists are zero-indexed and accessing an element via its index takes constant time. Dictionaries support values of different types, with the restriction that keys must be of an primitive type or \ms{NoneType}. For example, \ms{d = \{2: 'bonjour', False: 3.3\}} is a valid OPythn dictionary.
+   
     \subsection{Numeric and boolean operations}
-    Ordinary arithmetic operators for addition, multiplication, subtraction, division, modulus, and exponentiation are supported between types \ms{int} and \ms{float}. Additionally, OPythn supports the bitwise operations \ms{|}, \ms{\^}, \ms{\&}, \ms{<<}, \ms{>>}, and \ms{\~} on integers. Numeric values can be compared using the operators \ms{<}, \ms{<=}, \ms{>}, and \ms{>=}, and any values can be tested for equality using \ms{==}, \ms{!=}, \ms{is}, and \ms{is not}. Any object can be tested for truth value. The objects \ms{None}, \ms{False}, \ms{0}, \ms{0.0}, \ms{''}, \ms{[]}, and \ms{\string{\string}} are considered false; any other object is considered true.
+    Ordinary arithmetic operators for addition, multiplication, subtraction, division, modulus, and exponentiation are supported between types \ms{int} and \ms{float}. When performing integer division, OPythn takes the floor of the quotient, so \ms{-13 // 5} gives \ms{-3}, and the modulus operator always gives a positive result, so \ms{-13 \% 5} returns \ms{2}.\\
+    \indent OPythn supports the bitwise operations \ms{|}, \ms{\^}, \ms{\&}, \ms{<<}, \ms{>>}, and \ms{\~} on integers. Numeric values can be compared using the operators \ms{<}, \ms{<=}, \ms{>}, and \ms{>=} (note that chained comparisons are not allowed), and any values can be tested for equality using \ms{==}, \ms{!=}, \ms{is}, and \ms{is not}. Any object can be tested for truth value. The objects \ms{None}, \ms{False}, \ms{0}, \ms{0.0}, \ms{''}, \ms{[]}, and \ms{\string{\string}} are considered false; any other object is considered true.
 
     \subsection{String operations}
     The following useful methods are defined on strings, along with all of the methods on sequence types described in the following subsection.
@@ -189,7 +156,7 @@
         \item They can be indexed into using the postfix \ms{[ ]} operator. The expression inside must be an integer. Negative indices are allowed. For example, if \ms{x} is the list \ms{[1,2,3,4]}, then \ms{x[-2]} will return \ms{3}. Indexing into a list is the normal way to mutate a value. For example, running the expression \ms{x[1] = 'grape'} changes \ms{x} into the list \ms{[1,'grape',3,4]}. This cannot be done with tuples because they are immutable.
         \item The number of elements in the sequence (characters, in the case of strings), can be determined using the built-in function \ms{len()}.
         \item To determine if a sequence \ms{l} contains the element \ms{e}, one may use the expression \ms{e in l} which returns the corresponding boolean. When used with a \ms{for} loop, this syntax allows the user to iterate through all the elements in a list. To see if an element does not belong to a list, one may use \ms{not in}, but of course this cannot be used to create a \ms{for} loop. The \ms{enumerate} object does not exist in OPythn.
-        \item Sequence objects can be sliced using the operator \ms{:}. For example, if \ms{a = [1,True,3,'hi',5]}, then \ms{a[1:3]} would give the list \ms{[True, 3]}. Slicing in step increments is not supported and a \ms{slice} object cannot be explicitly created.
+        \item Sequence objects can be sliced using the operator \ms{:}. For example, if \ms{a = [1,True,3,'hi',5]}, then \ms{a[1:3]} would give the list \ms{[True, 3]}. This can be used with the \ms{del} keyword to delete a group of adjacent elements in a sequence. Slicing in step increments is not supported and a \ms{slice} object cannot be explicitly created.
         \item Sequences of the same type can be concatenated using the \ms{+} operator.
         \item A sequence can be explicitly converted into a list by calling \ms{list()} on it. (Calling \ms{list()} on a list returns the same list.)
     \end{itemize}
@@ -208,7 +175,7 @@
         \item An entry can be deleted using the syntax \ms{del dict[key]} and the entire dictionary can be deleted by calling \ms{del} on the whole dictionary.
         \item The user can determine if a key is present in a dictionary using \ms{in} or \ms{not in}.
     \end{itemize}
-    The following methods are defined on dictionary objects.
+    Note that two dictionaries are equal if they contain the same keys and values. The following methods are defined on dictionary objects.
     \begin{center}
         \begin{tabular}{cccc}
             \ms{clear()} & \ms{items()} & \ms{keys()} & \ms{values()}\\
@@ -314,9 +281,43 @@ Both the OPythn bytecode compiler and interpreter will be implemented in OCaml. 
     \end{lstlisting}
     Alternatively, OPythn source code can be defined in a separate \texttt{.opy} file and provided to the interpreter as a program argument. In this, mode, OPythn immediately compiles and interprets the source code directly.
     \subsection{Lexical Analysis}
-    Upon reading source code, the OPythn front-end passes the data as a string to a series of functions that lex the code into tokens. The lexer will be created with the help of \texttt{ocamllex}, a program that generates a deterministic finite automaton in OCaml. This resulting lexer matches regular expressions in the string to convert chunks of characters into the correct tokens. 
+    Upon reading source code, the OPythn front-end passes the data as a string to a series of functions that lex the code into tokens. The lexer will be created with the help of \texttt{ocamllex}, a program that generates a deterministic finite automaton in OCaml. This resulting lexer matches regular expressions in the string to convert chunks of characters into the correct tokens.\\
+    \indent The lexer will produce tokens of the following OCaml datatype:
+    \begin{lstlisting}[language=caml]
+    type token =
+      NEWLINE | INDENT | DEDENT
+    | NAME of string  (* identifier *)
+    | KWORD of string
+    | NUMBER of string
+    | STRING of string
+    | OP of string
+    | DELIM of string
+    \end{lstlisting}
     \subsection{Parsing}
-    The tokens produced by the lexer is then fed into the parser, which will be implemented according to the grammar rules outlined in Section 2.3 and using \texttt{menhir}, an OCaml parser generator. The result will be an abstract syntax tree that represents the structure and semantics of the OPythn program. 
+    The tokens produced by the lexer is then fed into the parser, which will be implemented according to the grammar rules outlined in Section 2.3 and using \texttt{menhir}, an OCaml parser generator. The result will be an abstract syntax tree that represents the structure and semantics of the OPythn program.\\
+     \indent Typed values are represented as follows:
+    \begin{lstlisting}[language=caml]
+    type py_prim =
+      INT of int
+    | FLOAT of float
+    | STR of string
+    | BOOL of bool
+    | NONE
+    \end{lstlisting}
+    There will be a separate type for OPythn compound types and then a general \ms{py\_val} type to capture both of these possibilities. To represent an OPythn list, we will need to create a resizing array type in OCaml. To represent a dictionary, we use an OCaml hashtable.
+    \begin{lstlisting}[language=caml]
+    type py_comp =
+      LIST of py_val Resizable.t (* dynamic array type *)
+    | DICT of (py_immut, py_val) Hashtbl.t
+    | TUPLE of py_val array
+    | TYPE of ...
+    | FUN of ...
+    | OBJ of ...
+    and type py_val =
+      IMMUT of py_prim
+    | MUT of py_comp
+    \end{lstlisting}
+
     \subsection{Bytecode}
     OPythn evaluates an abstract syntax tree by generating intermediary bytecode, which is evaluated by a virtual stack machine, as in many conventional Python implementations. As an example of what this looks like, consider this simple algorithm for integer multiplication in terms of addition:
     \begin{lstlisting}[language=python]
@@ -421,7 +422,14 @@ Both the OPythn bytecode compiler and interpreter will be implemented in OCaml. 
     \indent Additionally, the interpreter has access to an array of names and and array of constants, both of which were created upon code generation. For example, the instruction \texttt{LOAD\_NAME 1} accesses the name array at index 1 and pushes the associated object onto the stack; in our case above, this was the function \texttt{input}. Likewise, the instruction \texttt{LOAD\_CONST 5} accesses the constant array at the index 5 and pushes its value onto the stack.\\
     \indent Control-flow logic is implemented using the stack using certain instructions that tell the interpreter to jump to other parts of the bytecode. For example, at line 46 of the example bytecode, the top two elements on the stack are the values \texttt{0} and \texttt{y \% 2}. The \texttt{COMPARE\_OP 2} instruction checks if the top two elements of the stack are equal, and then pushes a boolean value onto the stack. The next instruction, \texttt{POP\_JUMP\_IF\_FALSE 68}, pops this boolean off the stack and jumps to line 68 if the boolean was false. Loops are implemented in a similar way. The instruction \texttt{SETUP\_LOOP} \textit{n} designates the next \textit{n} instructions as a block, and a test has to be run every loop to determine if the block should be exited via a \texttt{JUMP} instruction.\\
     \indent The evaluation procedure is performed by a recursive function \texttt{eval : int -> item list -> int}, in a context where the instruction, name, and constant arrays are defined. The \texttt{eval} function has as its inputs a line number and the current stack, and each time it is called, it performs the appropriate stack manipulations before calling itself again with the next line to evaluate. When \texttt{eval} runs out of instructions to evaluate (i.e. reaches the last instruction in the array with no \texttt{JUMP} command), the program halts and an exit code is returned.
-
+    
+    \section{Timeline}
+    The OPythn project aims to be complete by the end of June 2019.
+    \subsection{April 2019}
+    The month of April will be dedicated to creating a vertical slice of the entire OPythn project. To accomplish this, most of the lexer and parser will have to be written, but during this step, OPythn will not support functions and objects yet. Basic types, variable assignment, and control structures will be implemented and tested. Ideally, by the end of April, the intermediary compiler should be able to produce bytecode for the small snippet of code in Section 4.4. If possible, during this step we will also be able to implement part of the virtual machine as well, to make it easier to test the features of the language that will be added later on.
+    
+    \subsection{May 2019}
+    
 
 \begin{thebibliography}{1}
     \bibitem{pythonref} Guido van Rossum. \textit{The Python Language Reference}. Python Software Foundation, 2019.
