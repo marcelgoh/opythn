@@ -304,10 +304,10 @@ Both the OPythn bytecode compiler and interpreter will be implemented in OCaml. 
     | BOOL of bool
     | NONE
     \end{lstlisting}
-    There will be a separate type for OPythn compound types and then a general \ms{py\_val} type to capture both of these possibilities. To represent an OPythn list, we will need to create a resizing array type in OCaml. To represent a dictionary, we use an OCaml hashtable.
+    There will be a separate type for OPythn compound types and then a general \ms{py\_val} type to capture both of these possibilities. To represent an OPythn list, we will need the \ms{DynArray} module from the \ms{extlib} library. To represent a dictionary, we use an OCaml hashtable.
     \begin{lstlisting}[language=caml]
     type py_comp =
-      LIST of py_val Resizable.t (* dynamic array type *)
+      LIST of py_val DynArray.t
     | DICT of (py_immut, py_val) Hashtbl.t
     | TUPLE of py_val array
     | TYPE of ...

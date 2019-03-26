@@ -1,5 +1,7 @@
 BUILD = ocamlbuild -r -use-ocamlfind
 
+PKGFLAGS = -pkg extlib
+
 EXT = native
 EXEC = main
 
@@ -13,4 +15,4 @@ clean:
 	rm ${EXEC}
 
 %:
-	${BUILD} $@
+	${BUILD} ${PKGFLAGS} $@
