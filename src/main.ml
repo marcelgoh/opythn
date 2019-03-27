@@ -1,12 +1,13 @@
 (* OPythn main front-end *)
 
 open Printf
-open ExtLib
+open Parser
 
 let main () =
-  let arr = DynArray.make 10 in
-  DynArray.add arr 16;
-  printf "%d\n" (DynArray.get arr 0);
+  let module D = DynArray in
+  let arr = D.make 10 in
+  D.add arr 16;
+  printf "%d\n" (D.get arr 0);
   printf "Hello world\n"
 
 

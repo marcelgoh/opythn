@@ -1,5 +1,7 @@
-BUILD = ocamlbuild -r -use-ocamlfind
+BUILD = ocamlbuild
 
+FLAGS = -r ${USEFLAGS} ${PKGFLAGS}
+USEFLAGS = -use-ocamlfind -use-menhir
 PKGFLAGS = -pkg extlib
 
 EXT = native
@@ -15,4 +17,4 @@ clean:
 	rm ${EXEC}
 
 %:
-	${BUILD} ${PKGFLAGS} $@
+	${BUILD} ${FLAGS} $@
