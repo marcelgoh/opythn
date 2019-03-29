@@ -5,6 +5,7 @@
   open Parser
 
   exception Lex_error of string
+  exception Indent_error of int * int * int
 
   (* returns number of spaces, where a tab counts as 4 spaces *)
   let count_ws (str : string) : int =
@@ -16,14 +17,14 @@
   (* returns the number of numbers in stack greater than n *)
   let pop_and_count (stack : int Stack.t) (n : int) : int =
     let rec iter acc =
-      if Stack.top stack < n then begin
+      if Stack.top stack > n then begin
         (* pop the larger number off the stack and loop again *)
         let _ = Stack.pop stack in iter (acc + 1)
       end
       else if Stack.top stack = n then
              (* if number matches curr then this is the correct indentation level *)
              acc
-           else raise (Lex_error "Improper indentation") in
+           else raise (Indent_error ((Stack.top stack), n, acc)) in
     iter 0
 
   (* stack for indentation levels *)
@@ -44,21 +45,25 @@ rule read_one =
     integer    { INT (int_of_string (Lexing.lexeme lexbuf)) }
   | newline    { Lexing.new_line lexbuf; NEWLINE }
   | id         { ID (Lexing.lexeme lexbuf) }
-  | whitespace { if (lexbuf.lex_curr_p.pos_bol - lexbuf.lex_curr_p.pos_bol) = 0 then
+  | whitespace { Printf.printf "%d %d\n" lexbuf.lex_curr_p.pos_cnum lexbuf.lex_start_p.pos_cnum;
+                 if lexbuf.lex_start_p.pos_bol = 0 then
                    (* at the start of a line *)
                    let count = count_ws (Lexing.lexeme lexbuf) in
                    let topstack = Stack.top indent_levels in
                      if count > topstack then (
+                       Printf.printf "gt %d %d\n" count topstack;
                        Stack.push count indent_levels;
                        INDENT
                      )
-                     else if count < topstack then
-                            let num_dedents = pop_and_count indent_stack count in
+                     else if count < topstack then (
+                            Printf.printf "lt %d %d\n" count topstack;
+                            let num_dedents = pop_and_count indent_levels count in
                             (* return one dedent and push the rest onto a queue *)
                             for i = 0 to num_dedents - 1 do
-                              Queue.enqueue read_queue DEDENT
+                              Queue.add DEDENT read_queue
                             done;
                             DEDENT
+                          )
                           else read_one lexbuf (* ignore whitespace otherwise *)
                  else read_one lexbuf }
   | _          { raise (Lex_error ("Unexpected char: " ^ Lexing.lexeme lexbuf)) }

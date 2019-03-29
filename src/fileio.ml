@@ -17,10 +17,10 @@ let str_from_filename filename =
 (* read a program argument as file *)
 let str_of_prog_args () =
   if Array.length Sys.argv < 2 then
-    raise (File_error "A file must be passed as input.\n")
+    raise (File_error "A file must be passed as input.")
   else
     let filename = Sys.argv.(1) in
     if Filename.extension filename <> ".opy" then
-      raise (File_error "File extension not supported.\n")
+      raise (File_error "File extension not supported.")
     else
       str_from_filename filename
