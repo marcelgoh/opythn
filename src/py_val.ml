@@ -1,7 +1,6 @@
 (* Representation of OPythn typed values *)
 
-type t =
-  INT of int
+type t = INT of int
 | BOOL of bool
 | STR of string
 | FUN of (t list -> t)
