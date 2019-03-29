@@ -1,7 +1,9 @@
 (* Representation of OPythn typed values *)
 
-type py_val =
+type t =
   INT of int
 | BOOL of bool
 | STR of string
-| FUN of py_val list -> py_val
+| FUN of (t list -> t)
+| NONETYPE
+

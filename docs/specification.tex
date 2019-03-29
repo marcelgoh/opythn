@@ -93,11 +93,11 @@
     The following are OPythn keywords and cannot be used in ordinary identifiers:
     \begin{center}
         \begin{tabular}{cccccc}
-            \ms{int} & \ms{float} & \ms{str} & \ms{bool} & \ms{def} & \ms{return}\\
             \ms{True} & \ms{False} & \ms{None} & \ms{and} & \ms{or} & \ms{not}\\
             \ms{if} & \ms{elif} & \ms{else} & \ms{for} & \ms{in} & \ms{while}\\
             \ms{break} & \ms{continue} & \ms{class} & \ms{is} & \ms{del} & \ms{import}\\
-            \ms{in} & \ms{from} & \ms{as} &\ms{global} & \ms{nonlocal} & \ms{lambda}
+            \ms{in} & \ms{from} & \ms{as} &\ms{global} & \ms{nonlocal} & \ms{lambda}\\
+            \ms{def} & \ms{return} &&&&
     \end{tabular}
     \end{center}
     Any string that is not a keyword and contains uppercase and lowercase letters, underscores, and (except for the first character) numbers is a valid identifier. Case is significant. Some names are reserved for use by the standard library, which is described in Section 3.
@@ -109,7 +109,7 @@
     stringchar: <source character besides '\\', '\n', "'", '"'>
     stringescapeseq: '\\' <source character>
     \end{lstlisting}
-    \indent There are two types of numeric literals in OPythn: integers and floating-point numbers. Leading zeroes in a non-zero decimal are not allowed. Underscores are also not allowed in numeric literals, unlike in Python 3.
+    \indent There are two types of numeric literals in OPythn: integers and floating-point numbers. Leading zeroes in a non-zero decimal integer are not allowed. Underscores are also not allowed in numeric literals, unlike in Python 3.
     \begin{lstlisting}[language=python]
     integer: decinteger | bininteger | octinteger | hexinteger
     decinteger: nonzerodigit digit* | '0'+
@@ -287,7 +287,7 @@ Both the OPythn bytecode compiler and interpreter will be implemented in OCaml. 
     type token =
       NEWLINE | INDENT | DEDENT
     | NAME of string  (* identifier *)
-    | KWORD of string
+    | IF | WHILE (* other keywords... *)
     | NUMBER of string
     | STRING of string
     | OP of string
@@ -295,27 +295,20 @@ Both the OPythn bytecode compiler and interpreter will be implemented in OCaml. 
     \end{lstlisting}
     \subsection{Parsing}
     The tokens produced by the lexer is then fed into the parser, which will be implemented according to the grammar rules outlined in Section 2.3 and using \texttt{menhir}, an OCaml parser generator. The result will be an abstract syntax tree that represents the structure and semantics of the OPythn program.\\
-     \indent Typed values are represented as follows:
+     \indent Typed values are represented as follows. To represent an OPythn list, we will need the \ms{DynArray} module from the \ms{extlib} library. To represent a dictionary, we use an OCaml hashtable.
     \begin{lstlisting}[language=caml]
-    type py_prim =
+    type py_val =
       INT of int
     | FLOAT of float
     | STR of string
     | BOOL of bool
-    | NONE
-    \end{lstlisting}
-    There will be a separate type for OPythn compound types and then a general \ms{py\_val} type to capture both of these possibilities. To represent an OPythn list, we will need the \ms{DynArray} module from the \ms{extlib} library. To represent a dictionary, we use an OCaml hashtable.
-    \begin{lstlisting}[language=caml]
-    type py_comp =
-      LIST of py_val DynArray.t
+    | LIST of py_val DynArray.t
     | DICT of (py_immut, py_val) Hashtbl.t
     | TUPLE of py_val array
+    | FUN of (py_val list -> py_val)
     | TYPE of ...
-    | FUN of ...
     | OBJ of ...
-    and type py_val =
-      IMMUT of py_prim
-    | MUT of py_comp
+    | NONE
     \end{lstlisting}
 
     \subsection{Bytecode}

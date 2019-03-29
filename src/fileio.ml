@@ -2,6 +2,8 @@
 
 open Printf
 
+exception File_error of string
+
 (* opens the specified file and outputs its contents as a string *)
 let str_from_filename filename =
   try
@@ -13,15 +15,12 @@ let str_from_filename filename =
   with e -> None
 
 (* read a program argument as file *)
-let read_prog_args () =
+let str_of_prog_args () =
   if Array.length Sys.argv < 2 then
-    printf "A file must be passed as input.\n"
+    raise (File_error "A file must be passed as input.\n")
   else
     let filename = Sys.argv.(1) in
     if Filename.extension filename <> ".opy" then
-      printf "File extension not supported.\n"
+      raise (File_error "File extension not supported.\n")
     else
-      let contents = str_from_filename filename in
-      match contents with
-      Some s -> printf "%s" s
-      | None -> printf "Failed to get text from file.\n"
+      str_from_filename filename

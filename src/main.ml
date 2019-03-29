@@ -1,16 +1,13 @@
 (* OPythn main front-end *)
 
 open Printf
+open Lexer
 open Parser
 
 let main () =
-  let module D = DynArray in
-  let arr = D.make 10 in
-  D.add arr 16;
-  printf "%d\n" (D.get arr 0);
-  printf "Hello world\n"
-
-
-
+  opy_code = Fileio.str_of_prog_args;
+  match opy_code with
+    Some s -> printf "%s" s
+    | None -> printf "A file must be provided as input.\n"
 
 let _ = main ()

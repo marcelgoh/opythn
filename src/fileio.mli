@@ -1,3 +1,3 @@
 (* File I/O *)
 
-val read_prog_args : unit -> unit
+val str_of_prog_args : unit -> string option
