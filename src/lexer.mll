@@ -2,7 +2,6 @@
 
 {
   open Lexing
-  open Parser
   open Token
 
   exception Lex_error of string

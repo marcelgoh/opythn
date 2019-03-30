@@ -5,15 +5,19 @@
 %token <string> OP
 %token <string> STR
 %token NEWLINE %token INDENT %token DEDENT %token EOF
-%token TRUE  %token FALSE %token NONE
-%token IF    %token ELIF  %token ELSE
-%token WHILE %token BREAK %token CONTINUE
+(* keywords *)
+%token TRUE    %token FALSE  %token NONE
+%token IF      %token ELIF   %token ELSE
+%token WHILE   %token BREAK  %token CONTINUE
+(* word-like operators *)
 %token AND %token OR %token NOT %token IS %token IN
+(* symbolic operators *)
 %token PLUS    %token MINUS  %token TIMES %token FP_DIV
 %token INT_DIV %token MOD    %token EXP   %token EQ
 %token NEQ     %token LT     %token GT    %token LEQ
 %token GEQ     %token BW_AND %token BW_OR %token BW_COMP
 %token BW_XOR  %token LSHIFT %token RSHIFT
+(* delimiters *)
 %token LPAREN   %token RPAREN   %token LSQUARE  %token RSQUARE
 %token LCURLY   %token RCURLY   %token DOT      %token COMMA
 %token COLON    %token SEMIC    %token ASSIG    %token PLUS_A
