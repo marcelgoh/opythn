@@ -3,6 +3,7 @@
 {
   open Lexing
   open Parser
+  open Token
 
   exception Lex_error of string
   exception Indent_error of int * int * int
@@ -12,6 +13,16 @@
   let () = Stack.push 0 indent_levels
   (* queue for dedent tokens *)
   let read_queue = Queue.create ()
+  (* hashtable of keywords and word-like operators*)
+  let keyword_table = Hashtbl.create 30
+  let _ =
+    List.iter (fun (kword, tok) ->
+                 Hashtbl.add keyword_table kword tok)
+              [ "True", TRUE;   "False", FALSE; "None", NONE;
+(* logic ops *) "and", AND;     "or", OR;       "not", NOT;
+(* rel ops *)   "is", IS;       "in", IN;
+                "if", IF;       "elif", ELIF;   "else", ELSE;
+                "while", WHILE; "break", BREAK; "continue", CONTINUE ]
 
   (* returns number of spaces, where a tab counts as 4 spaces *)
   let count_ws (str : string) : int =
@@ -51,11 +62,15 @@ let whitespace = [' ' '\t']+
 let newline = '\r' | '\n' | "\r\n"
 let id = ['a'-'z' 'A'-'Z' '_'] ['a'-'z' 'A'-'Z' '_' '0'-'9']*
 
+(* consumes a token of the input buffer *)
 rule read_one =
   parse
     integer    { INT (int_of_string (Lexing.lexeme lexbuf)) }
   | newline    { Lexing.new_line lexbuf; NEWLINE }
-  | id         { ID (Lexing.lexeme lexbuf) }
+  | id         { let word = Lexing.lexeme lexbuf in
+                 (* check for keywords *)
+                 try Hashtbl.find keyword_table word
+                 with Not_found -> ID word }
   | whitespace { if lexbuf.lex_start_p.pos_cnum = lexbuf.lex_start_p.pos_bol then
                    (* at the start of a line *)
                    let count = count_ws (Lexing.lexeme lexbuf) in
@@ -68,9 +83,23 @@ rule read_one =
                             enqueue_dedents read_queue indent_levels count;
                             DEDENT
                           )
-                          else read_one lexbuf (* ignore whitespace otherwise *)
-                 else read_one lexbuf }
+                          else read_one lexbuf (* ignore when indentation equal *)
+                 else read_one lexbuf } (* ignore when not at start of line *)
   | '#'        { read_line_comment lexbuf }
+  (* symbolic operators *)
+  | '+'  { PLUS }    | '-'  { MINUS }  | '*'  { TIMES }  | '/'  { FP_DIV }
+  | "//" { INT_DIV } | '%'  { MOD }    | "**" { EXP }    | "==" { EQ }
+  | "!=" { NEQ }     | '<'  { LT }     | '>'  { GT }     | "<=" { LEQ }
+  | ">=" { GEQ }     | '&'  { BW_AND } | '|'  { BW_OR }  | '~'  { BW_COMP }
+  | '^'  { BW_XOR }  | "<<" { LSHIFT } | ">>" { RSHIFT }
+  (* delimiters *)
+  | '(' { LPAREN }    | '('  { RPAREN }    | '[' { LSQUARE }   | ']'  { RSQUARE }
+  | '{' { LCURLY }    | '}'  { RCURLY }    | '.' { DOT }       | ','  { COMMA }
+  | ':' { COLON }     | ';'  { SEMIC }     | '=' { ASSIG }     | "+=" { PLUS_A }
+  | "-=" { MINUS_A }  | "*=" { TIMES_A }   | "/=" { FP_DIV_A } | "//=" { INT_DIV_A }
+  | "%=" { MOD_A }    | "**=" { EXP_A }    | "&=" { BW_AND_A } | "|=" { BW_OR_A }
+  | "^=" { BW_XOR_A } | "<<=" { LSHIFT_A } | ">>" { RSHIFT_A }
+  (* keywords *)
   | _          { raise (Lex_error ("Unexpected char: " ^ Lexing.lexeme lexbuf)) }
   | eof        { if Stack.top indent_levels <> 0 then (
                    enqueue_dedents read_queue indent_levels 0;
@@ -79,6 +108,7 @@ rule read_one =
                  )
                  else EOF }
 
+(* handle line comments by ignoring everything until a newline *)
 and read_line_comment =
   parse
     newline { read_one lexbuf }
@@ -87,6 +117,7 @@ and read_line_comment =
 
 {
   let read lexbuf =
+    (* if the read queue has tokens in it, no need to consume new token yet *)
     if Queue.is_empty read_queue then
       read_one lexbuf
     else Queue.take read_queue
