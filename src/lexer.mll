@@ -54,14 +54,7 @@ let id = ['a'-'z' 'A'-'Z' '_'] ['a'-'z' 'A'-'Z' '_' '0'-'9']*
 rule read_one =
   parse
     integer    { INT (int_of_string (Lexing.lexeme lexbuf)) }
-  | newline    { if lexbuf.lex_start_p.pos_cnum = lexbuf.lex_start_p.pos_bol then (
-                   (* a newline at the beginning of the line resets indentation *)
-                   Lexing.new_line lexbuf;
-                   enqueue_dedents read_queue indent_levels 0;
-                   Queue.add NEWLINE read_queue;
-                   DEDENT
-                 )
-                 else (Lexing.new_line lexbuf; NEWLINE) }
+  | newline    { Lexing.new_line lexbuf; NEWLINE }
   | id         { ID (Lexing.lexeme lexbuf) }
   | whitespace { if lexbuf.lex_start_p.pos_cnum = lexbuf.lex_start_p.pos_bol then
                    (* at the start of a line *)
