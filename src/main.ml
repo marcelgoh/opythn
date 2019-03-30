@@ -1,8 +1,6 @@
 (* OPythn main front-end *)
 
 open Printf
-open Lexer
-open Parser
 
 let main () =
   let opy_code = Fileio.str_of_prog_args () in

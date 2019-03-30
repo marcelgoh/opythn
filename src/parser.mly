@@ -1,5 +1,6 @@
 (* Parser generator for OPythn, for use with menhir *)
 
+
 %token <string> ID
 %token <int> INT
 %token <string> OP
@@ -11,7 +12,7 @@
 %token WHILE   %token BREAK  %token CONTINUE
 (* word-like operators *)
 %token AND %token OR %token NOT %token IS %token IN
-(* symbolic operators *)
+(* symbolic operators TODO: add associativity *)
 %token PLUS    %token MINUS  %token TIMES %token FP_DIV
 %token INT_DIV %token MOD    %token EXP   %token EQ
 %token NEQ     %token LT     %token GT    %token LEQ
