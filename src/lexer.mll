@@ -52,12 +52,38 @@
       (* put all but one DEDENT onto the queue *)
       Queue.add DEDENT queue
     done
+
+  (* converts all escape sequences in string to their OCaml version *)
+  let unescape (str : string) : string =
+    let buf = Buffer.create 10 in
+    let i = ref 0 in
+    while !i < String.length str do
+      if str.[!i] = '\\' then (
+          incr i;
+          if !i < String.length str then
+            let c = match str.[!i] with
+                      '\\' -> '\\'
+                    | '"'  -> '"'
+                    | '\'' -> '\''
+                    | 'b'  -> '\b'
+                    | 'n'  -> '\n'
+                    | 'r'  -> '\r'
+                    | 't'  -> '\t'
+                    | _    -> raise (Lex_error ("Undefined escape sequence: \\" ^
+                                                (String.make 1 str.[!i]))) in
+            Buffer.add_char buf c
+      )
+      else Buffer.add_char buf str.[!i];
+      incr i;
+    done;
+    Buffer.contents buf
 }
 
 let integer = '-'? ['1'-'9'] ['0'-'9']* | '-'? '0'*
 let whitespace = [' ' '\t']+
 let newline = '\r' | '\n' | "\r\n"
 let id = ['a'-'z' 'A'-'Z' '_'] ['a'-'z' 'A'-'Z' '_' '0'-'9']*
+let string_char = [^ '\n' '\'' '"' '\\'] | '\\' _
 
 (* consumes a token of the input buffer *)
 rule read_one =
@@ -69,10 +95,10 @@ rule read_one =
   | ">=" { GEQ }     | '&'  { BW_AND } | '|'  { BW_OR }  | '~'  { BW_COMP }
   | '^'  { BW_XOR }  | "<<" { LSHIFT } | ">>" { RSHIFT }
   (* delimiters *)
-  | '(' { LPAREN }    | ')'  { RPAREN }    | '[' { LSQUARE }   | ']'  { RSQUARE }
-  | '{' { LCURLY }    | '}'  { RCURLY }    | '.' { DOT }       | ','  { COMMA }
-  | ':' { COLON }     | ';'  { SEMIC }     | '=' { ASSIG }     | "+=" { PLUS_A }
-  | "-=" { MINUS_A }  | "*=" { TIMES_A }   | "/=" { FP_DIV_A } | "//=" { INT_DIV_A }
+  | '('  { LPAREN }   | ')'   { RPAREN }   | '['  { LSQUARE }  | ']'  { RSQUARE }
+  | '{'  { LCURLY }   | '}'   { RCURLY }   | '.'  { DOT }      | ','  { COMMA }
+  | ':'  { COLON }    | ';'   { SEMIC }    | '='  { ASSIG }    | "+=" { PLUS_A }
+  | "-=" { MINUS_A }  | "*="  { TIMES_A }  | "/=" { FP_DIV_A } | "//=" { INT_DIV_A }
   | "%=" { MOD_A }    | "**=" { EXP_A }    | "&=" { BW_AND_A } | "|=" { BW_OR_A }
   | "^=" { BW_XOR_A } | "<<=" { LSHIFT_A } | ">>" { RSHIFT_A }
   | integer    { INT (int_of_string (Lexing.lexeme lexbuf)) }
@@ -105,7 +131,10 @@ rule read_one =
                  else read_one lexbuf } (* ignore when not at start of line *)
   | '#'        { read_line_comment lexbuf }
   (* strings *)
-  | '"'        { read_double_quote (Buffer.create 10) lexbuf }
+  | '"' ((string_char | '\'')* as s) '"'
+               { STR (unescape s) }
+  | '\'' ((string_char | '"')* as s) '\''
+               { STR (unescape s) }
   | _          { raise (Lex_error ("Unexpected char: " ^ Lexing.lexeme lexbuf)) }
   | eof        { if Stack.top indent_levels <> 0 then (
                    enqueue_dedents read_queue indent_levels 0;
@@ -120,16 +149,6 @@ and read_line_comment =
     newline { read_one lexbuf }
   | eof     { EOF }
   | _       { read_line_comment lexbuf }
-
-(* read a double-quoted string *)
-and read_double_quote buf =
-  (* TODO: add escape characters *)
-  parse
-    '"'      { STR (Buffer.contents buf) }
-  | [^ '"']+ { Buffer.add_string buf (Lexing.lexeme lexbuf);
-               read_double_quote buf lexbuf }
-  | _        { raise (Lex_error ("Illegal character in string: " ^ Lexing.lexeme lexbuf)) }
-  | eof      { raise (Lex_error "EOF reached while lexing string.") }
 
 {
   let read lexbuf =

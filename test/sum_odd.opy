@@ -8,3 +8,4 @@ while x < 100:
         sum = sum + x
     x = x + 1
 print ("The sum is", sum)
+print ('This\tstring\nis\rfull\\\'"of escape" \csequences')
