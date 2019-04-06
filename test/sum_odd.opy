@@ -7,5 +7,7 @@ while x < 100:
     if x % 2 == 1:
         sum = sum + x
     x = x + 1
-print ("The sum is", sum)
-print ('This\tstring\nis\rfull\\\'"of escape" \csequences')
+print ("The sum is",
+                sum,
+                      "another string")
+print ('This\tstring\nis\rfull\\\'"of escape" sequences')

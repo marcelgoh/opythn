@@ -7,6 +7,8 @@
   exception Lex_error of string
   exception Indent_error of int * int * int
 
+  (* number of brackets *)
+  let num_brackets = ref 0
   (* stack for indentation levels *)
   let indent_levels = Stack.create ()
   let () = Stack.push 0 indent_levels
@@ -95,14 +97,22 @@ rule read_one =
   | ">=" { GEQ }     | '&'  { BW_AND } | '|'  { BW_OR }  | '~'  { BW_COMP }
   | '^'  { BW_XOR }  | "<<" { LSHIFT } | ">>" { RSHIFT }
   (* delimiters *)
-  | '('  { LPAREN }   | ')'   { RPAREN }   | '['  { LSQUARE }  | ']'  { RSQUARE }
-  | '{'  { LCURLY }   | '}'   { RCURLY }   | '.'  { DOT }      | ','  { COMMA }
-  | ':'  { COLON }    | ';'   { SEMIC }    | '='  { ASSIG }    | "+=" { PLUS_A }
-  | "-=" { MINUS_A }  | "*="  { TIMES_A }  | "/=" { FP_DIV_A } | "//=" { INT_DIV_A }
-  | "%=" { MOD_A }    | "**=" { EXP_A }    | "&=" { BW_AND_A } | "|=" { BW_OR_A }
-  | "^=" { BW_XOR_A } | "<<=" { LSHIFT_A } | ">>" { RSHIFT_A }
+  | '('  { incr num_brackets; LPAREN }
+  | '['  { incr num_brackets; LSQUARE }
+  | '{'  { incr num_brackets; LCURLY }
+  | ')'  { decr num_brackets; RPAREN }
+  | ']'  { decr num_brackets; RSQUARE }
+  | '}'  { decr num_brackets; RCURLY }
+  | '.'  { DOT }      | ','  { COMMA } | ':'  { COLON }    | ';'   { SEMIC }
+  | '='  { ASSIG }    | "+=" { PLUS_A }| "-=" { MINUS_A }  | "*="  { TIMES_A }
+  | "/=" { FP_DIV_A } | "//=" { INT_DIV_A } | "%=" { MOD_A }    | "**=" { EXP_A }
+  | "&=" { BW_AND_A } | "|=" { BW_OR_A } | "^=" { BW_XOR_A } | "<<=" { LSHIFT_A }
+  | ">>" { RSHIFT_A }
   | integer    { INT (int_of_string (Lexing.lexeme lexbuf)) }
-  | newline    { Lexing.new_line lexbuf; NEWLINE }
+  | newline    { Lexing.new_line lexbuf;
+                 if !num_brackets = 0 then
+                   NEWLINE
+                 else read_one lexbuf }
   | id         { let ret_token =
                    let word = Lexing.lexeme lexbuf in
                    (* check for keywords *)
@@ -115,8 +125,9 @@ rule read_one =
                    DEDENT
                  )
                  else ret_token }
-  | whitespace { if lexbuf.lex_start_p.pos_cnum = lexbuf.lex_start_p.pos_bol then
-                   (* at the start of a line *)
+  | whitespace { if lexbuf.lex_start_p.pos_cnum = lexbuf.lex_start_p.pos_bol &&
+                    !num_brackets = 0 then
+                   (* at tke start of a line *)
                    let count = count_ws (Lexing.lexeme lexbuf) in
                    let topstack = Stack.top indent_levels in
                      if count > topstack then (
