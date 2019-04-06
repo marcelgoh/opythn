@@ -27,3 +27,8 @@ type stmt =
 [@@deriving show]
 
 type program = stmt list
+[@@deriving show]
+
+let show prog =
+  let module S = Str in
+  S.global_replace (S.regexp_string "Ast.") "" (show_program prog)

@@ -1,6 +1,7 @@
 (* OPythn main front-end *)
 
 open Printf
+open Ast
 
 let main () =
   let opy_code = Fileio.str_of_prog_args () in
@@ -13,5 +14,10 @@ let main () =
               done;
               printf "%s" (Token.show !tok);
     | None -> printf "A file must be provided as input.\n"
+  (* test printing of AST
+  let prog = [ (Assign("greeting", (StrLit "hi")));
+               (Expr  (Op (Plus, [IntLit 3; IntLit 5]))) ] in
+  printf "%s\n" (Ast.show prog)
+  *)
 
 let _ = main ()
