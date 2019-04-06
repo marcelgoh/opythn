@@ -97,8 +97,8 @@ rule read_one =
   | ">=" { GEQ }     | '&'  { BW_AND } | '|'  { BW_OR }  | '~'  { BW_COMP }
   | '^'  { BW_XOR }  | "<<" { LSHIFT } | ">>" { RSHIFT }
   (* delimiters *)
-  | '('  { incr num_brackets; LPAREN }
-  | '['  { incr num_brackets; LSQUARE }
+  | '('  { incr num_brackets; LPAREN }   (* ignore newlines and leading whitespace *)
+  | '['  { incr num_brackets; LSQUARE }  (* if in bracketed expression *)
   | '{'  { incr num_brackets; LCURLY }
   | ')'  { decr num_brackets; RPAREN }
   | ']'  { decr num_brackets; RSQUARE }
@@ -108,6 +108,7 @@ rule read_one =
   | "/=" { FP_DIV_A } | "//=" { INT_DIV_A } | "%=" { MOD_A }    | "**=" { EXP_A }
   | "&=" { BW_AND_A } | "|=" { BW_OR_A } | "^=" { BW_XOR_A } | "<<=" { LSHIFT_A }
   | ">>" { RSHIFT_A }
+  | "not in" { NOT_IN } | "is not" { IS_NOT } (* two-word operators *)
   | integer    { INT (int_of_string (Lexing.lexeme lexbuf)) }
   | newline    { Lexing.new_line lexbuf;
                  if !num_brackets = 0 then
@@ -127,7 +128,7 @@ rule read_one =
                  else ret_token }
   | whitespace { if lexbuf.lex_start_p.pos_cnum = lexbuf.lex_start_p.pos_bol &&
                     !num_brackets = 0 then
-                   (* at tke start of a line *)
+                   (* at tke start of a line, not in bracketed expression *)
                    let count = count_ws (Lexing.lexeme lexbuf) in
                    let topstack = Stack.top indent_levels in
                      if count > topstack then (

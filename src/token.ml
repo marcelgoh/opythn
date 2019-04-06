@@ -8,7 +8,7 @@ type token =
 | IF    | ELIF  | ELSE
 | WHILE | BREAK | CONTINUE
 (* word-like operators *)
-| AND | OR | NOT | IS | IN
+| AND | OR | NOT | IS | IN | NOT_IN | IS_NOT
 (* symbolic operators *)
 | PLUS    | MINUS  | TIMES | FP_DIV
 | INT_DIV | MOD    | EXP   | EQ
