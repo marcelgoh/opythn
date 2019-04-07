@@ -2,11 +2,11 @@
 
 type op =
   And | Or | Not  | Is | In | NotIn | IsNot
-| Plus   | Minus  | Times | FpDiv
-| IntDiv | Mod    | Exp   | Eq
-| Neq    | Lt     | Gt    | Leq
-| Geq    | BwAnd  | BwOr  | BwComp
-| BwXor  | LShift | RShift
+| Plus   | Minus  | Times  | FpDiv
+| IntDiv | Mod    | Exp    | Eq
+| Neq    | Lt     | Gt     | Leq
+| Geq    | BwAnd  | BwOr   | BwComp
+| BwXor  | LShift | RShift | Neg
 [@@deriving show]
 
 type expr =
@@ -17,13 +17,16 @@ type expr =
 | Call of expr * (expr list)
 (* operators are treated the same regardless of arity *)
 | Op of op * (expr list)
+| Cond of expr * expr * expr (* ternary expression *)
 [@@deriving show]
 
 type stmt =
   Expr of expr
 | Assign of string * expr
-| If of expr * stmt * (stmt option)
-| While of expr * stmt
+| If of expr * stmt list * (stmt option)
+| While of expr * stmt list
+| Break
+| Continue
 [@@deriving show]
 
 type program = stmt list

@@ -4,6 +4,7 @@
   open Ast
 %}
 
+(* basic tokens *)
 %token <string> ID
 %token <int> INT
 %token <string> OP
@@ -41,19 +42,75 @@
 %left PLUS MINUS
 %left TIMES FP_DIV INT_DIV MOD
 %right EXP
+%nonassoc MINUS
 %right LSQUARE LPAREN DOT
 
 %start <Ast.program> file_input
 
-%%
+%% (* list of production rules *)
 
-file_input: EOF { [ Expr(Var "hi") ] }
-(*
-stmt: simple_stmt | compound_stmt
+(* start symbols *)
+file_input:
+  ss = stmt*; EOF { ss }
 
-small_stmt: expr_stmt (* add more stmt types later *)
-expr_stmt: testlist_star_expr
+(* STATEMENTS *)
+stmt:
+  s = (simple_stmt | compound_stmt) { s }
+(* simple statements *)
+simple_stmt:
+  s = small_stmt; ss = (SEMIC small_stmt)*; SEMIC?; NEWLINE { s :: ss }
+small_stmt:
+  s = (expr_stmt | flow_stmt) { s }
+flow_stmt:
+  BREAK { Break }
+| CONTINUE { Continue }
 
+(* compound statements *)
+compound_stmt:
+  s = (if_stmt | while_stmt) { s }
+if_stmt:
+  IF; cond = (test | cond_expr); COLON;
+    pos = suite;
+  elifs = elif_stmt*;
+  neg = (ELSE COLON suite)? {
+    If(cond, (pos :: elifs), neg)
+  }
+elif_stmt:
+  ELIF; cond = (test | cond_expr); COLON; pos = suite {
+    If(cond, suite, None)
+  }
+while_stmt:
+  WHILE; cond = (test | cond_expr); COLON; pos = suite {
+    While(cond, suite)
+  }
+suite:
+  s = simple_stmt { [s] }
+| NEWLINE; INDENT; ss = stmt+; DEDENT { ss }
 
-compound_stmt: if_stmt | while_stmt
-*)
+(* EXPRESSIONS *)
+cond_expr:
+  e1 = test; IF; cond = test; ELSE; e2 = cond_expr {
+    Cond(cond, e1, e2)
+  }
+test:
+  t1 = test; OR; t2 = test { Op(Or, [t1, t2]) }
+| t1 = test; AND; t2 = test { Op(And, [t1, t2]) }
+| NOT; t = test { Op (Not, [t]) }
+| c = comparison { c }
+comparison:
+  e = expr { e }
+| e1 = expr; op = comp_op; e2 = expr { Comp(op, [e1, e2]) }
+comp_op:
+  LT { Lt }   | GT { Gt } | EQ { Eq }        | LEQ { Leq } | GEQ { Geq }
+| NEQ { Neq } | IN { In } | NOT_IN { NotIn } | IS { IS }   | IS_NOT { IsNot }
+expr:
+  a = atom_expr { a }
+| e1 = expr; op = bin_op; e2 = expr { Op(op, [e1, e2]) }
+| op = un_op ; e = expr { Op(op, [e]) }
+bin_op:
+  BW_OR { BwOr }    | BW_XOR { BwXor }   | BW_AND { BwAnd } | LSHIFT { LShift }
+| RSHIFT { RShift } | PLUS { Plus }      | MINUS { Minus }  | TIMES { Times }
+| FP_DIV { FpDiv }  | INT_DIV { IntDiv } | MOD { Mod }      | EXP { Exp}
+un_op:
+  MINUS { Neg } | BW_COMP { BwComp }
+
