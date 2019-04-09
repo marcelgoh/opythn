@@ -31,18 +31,20 @@
 %token BW_XOR_A %token LSHIFT_A %token RSHIFT_A
 
 (* associativity and precedence *)
+%left NEWLINE
+%left SEMIC
 %left OR
 %left AND
 %nonassoc NOT
-%left IN NOT_IN IS IS_NOT LT LEQ GT GEQ NEQ EQ
+(* %left IN NOT_IN IS IS_NOT LT LEQ GT GEQ NEQ EQ *)
 %left BW_OR
 %left BW_XOR
 %left BW_AND
+%nonassoc BW_COMP
 %left LSHIFT RSHIFT
 %left PLUS MINUS
 %left TIMES FP_DIV INT_DIV MOD
 %right EXP
-%nonassoc MINUS
 %right LSQUARE LPAREN DOT
 
 %start <Ast.program> file_input
@@ -55,32 +57,42 @@ file_input:
 
 (* STATEMENTS *)
 stmt:
-  s = (simple_stmt | compound_stmt) { s }
+  s = simple_stmt { s }
+| s = compound_stmt { s }
 (* simple statements *)
+semicolon_stmt:
+  SEMIC; s = small_stmt { s }
 simple_stmt:
-  s = small_stmt; ss = (SEMIC small_stmt)*; SEMIC?; NEWLINE { s :: ss }
+  s = small_stmt; ss = semicolon_stmt*; SEMIC?; NEWLINE { s :: ss }
 small_stmt:
-  s = (expr_stmt | flow_stmt) { s }
+  s = expr_stmt { s }
+| s = flow_stmt { s }
 flow_stmt:
   BREAK { Break }
 | CONTINUE { Continue }
 
 (* compound statements *)
 compound_stmt:
-  s = (if_stmt | while_stmt) { s }
+  s = if_stmt { s }
+| s = while_stmt { s }
+condition:
+  t = test { t }
+| c = cond_expr { c }
+else_clause:
+  ELSE; COLON; s = suite { s }
 if_stmt:
-  IF; cond = (test | cond_expr); COLON;
+  IF; cond = condition; COLON;
     pos = suite;
   elifs = elif_stmt*;
-  neg = (ELSE COLON suite)? {
+  neg = else_clause? {
     If(cond, (pos :: elifs), neg)
   }
 elif_stmt:
-  ELIF; cond = (test | cond_expr); COLON; pos = suite {
+  ELIF; cond = condition; COLON; pos = suite {
     If(cond, suite, None)
   }
 while_stmt:
-  WHILE; cond = (test | cond_expr); COLON; pos = suite {
+  WHILE; cond = condition; COLON; pos = suite {
     While(cond, suite)
   }
 suite:
@@ -88,6 +100,13 @@ suite:
 | NEWLINE; INDENT; ss = stmt+; DEDENT { ss }
 
 (* EXPRESSIONS *)
+expr_stmt:
+  e = expr { Expr e }
+| c = cond_expr { Expr c }
+| s = ID; ASSIG; e = assignable_expr { Assign(s, e) }
+assignable_expr:
+  e = expr { e }
+| c = cond_expr { c }
 cond_expr:
   e1 = test; IF; cond = test; ELSE; e2 = cond_expr {
     Cond(cond, e1, e2)
@@ -101,16 +120,29 @@ comparison:
   e = expr { e }
 | e1 = expr; op = comp_op; e2 = expr { Comp(op, [e1, e2]) }
 comp_op:
-  LT { Lt }   | GT { Gt } | EQ { Eq }        | LEQ { Leq } | GEQ { Geq }
-| NEQ { Neq } | IN { In } | NOT_IN { NotIn } | IS { IS }   | IS_NOT { IsNot }
+  LT { Lt }   | GT { Gt }   | EQ { Eq } | LEQ { Leq }
+| GEQ { Geq } | NEQ { Neq } | IN { In } | NOT_IN { NotIn }
+| IS { IS }   | IS_NOT { IsNot }
 expr:
-  a = atom_expr { a }
-| e1 = expr; op = bin_op; e2 = expr { Op(op, [e1, e2]) }
-| op = un_op ; e = expr { Op(op, [e]) }
-bin_op:
-  BW_OR { BwOr }    | BW_XOR { BwXor }   | BW_AND { BwAnd } | LSHIFT { LShift }
-| RSHIFT { RShift } | PLUS { Plus }      | MINUS { Minus }  | TIMES { Times }
-| FP_DIV { FpDiv }  | INT_DIV { IntDiv } | MOD { Mod }      | EXP { Exp}
-un_op:
-  MINUS { Neg } | BW_COMP { BwComp }
-
+  a = atom { a }
+| e1 = expr; BW_OR; e2 = expr { Op(BwOr, [e1, e2]) }
+| e1 = expr; BW_XOR; e2 = expr { Op(BwXOr, [e1, e2]) }
+| e1 = expr; BW_AND; e2 = expr { Op(BwAnd, [e1, e2]) }
+| e1 = expr; LSHIFT; e2 = expr { Op(LShift, [e1, e2]) }
+| e1 = expr; RSHIFT; e2 = expr { Op(RShift, [e1, e2]) }
+| e1 = expr; PLUS; e2 = expr { Op(Plus, [e1, e2]) }
+| e1 = expr; MINUS; e2 = expr { Op(Minus, [e1, e2]) }
+| e1 = expr; TIMES; e2 = expr { Op(Times, [e1, e2]) }
+| e1 = expr; FP_DIV; e2 = expr { Op(FpDiv, [e1, e2]) }
+| e1 = expr; INT_DIV; e2 = expr { Op(IntDiv, [e1, e2]) }
+| e1 = expr; MOD; e2 = expr { Op(Mod, [e1, e2]) }
+| e1 = expr; EXP; e2 = expr { Op(Exp, [e1, e2]) }
+| MINUS; e = expr { Op(Neg, [e]) }
+| BW_COMP; e = expr { Op(BwComp, [e]) }
+atom:
+  v = ID { Var i }
+| i = INT { IntLit i }
+| s = STR { StrLit s }
+| TRUE { BoolLit true }
+| FALSE { BoolLit false }
+| NONE { None }

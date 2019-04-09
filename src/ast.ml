@@ -18,6 +18,7 @@ type expr =
 (* operators are treated the same regardless of arity *)
 | Op of op * (expr list)
 | Cond of expr * expr * expr (* ternary expression *)
+| None
 [@@deriving show]
 
 type stmt =
