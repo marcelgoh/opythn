@@ -14,9 +14,9 @@ type expr =
 | IntLit of int
 | BoolLit of bool
 | StrLit of string
-| Call of expr * (expr list)
+| Call of expr * expr list
 (* operators are treated the same regardless of arity *)
-| Op of op * (expr list)
+| Op of op * expr list
 | Cond of expr * expr * expr (* ternary expression *)
 | None
 [@@deriving show]
@@ -24,7 +24,7 @@ type expr =
 type stmt =
   Expr of expr
 | Assign of string * expr
-| If of expr * stmt list * (stmt option)
+| If of expr * stmt list * ((stmt list) option)
 | While of expr * stmt list
 | Break
 | Continue

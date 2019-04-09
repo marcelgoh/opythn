@@ -63,7 +63,8 @@ stmt:
 semicolon_stmt:
   SEMIC; s = small_stmt { s }
 simple_stmt:
-  s = small_stmt; ss = semicolon_stmt*; SEMIC?; NEWLINE { s :: ss }
+  (* removed optional semicolon at the end of line for now *)
+  s = small_stmt; semicolon_stmt*; NEWLINE { s }
 small_stmt:
   s = expr_stmt { s }
 | s = flow_stmt { s }
@@ -85,15 +86,15 @@ if_stmt:
     pos = suite;
   elifs = elif_stmt*;
   neg = else_clause? {
-    If(cond, (pos :: elifs), neg)
+    If(cond, List.append pos elifs, neg)
   }
 elif_stmt:
   ELIF; cond = condition; COLON; pos = suite {
-    If(cond, suite, None)
+    If(cond, pos, None)
   }
 while_stmt:
   WHILE; cond = condition; COLON; pos = suite {
-    While(cond, suite)
+    While(cond, pos)
   }
 suite:
   s = simple_stmt { [s] }
@@ -112,35 +113,35 @@ cond_expr:
     Cond(cond, e1, e2)
   }
 test:
-  t1 = test; OR; t2 = test { Op(Or, [t1, t2]) }
-| t1 = test; AND; t2 = test { Op(And, [t1, t2]) }
-| NOT; t = test { Op (Not, [t]) }
+  t1 = test; OR; t2 = test { Op(Or, [t1; t2]) }
+| t1 = test; AND; t2 = test { Op(And, [t1; t2]) }
+| NOT; t = test { Op(Not, [t]) }
 | c = comparison { c }
 comparison:
   e = expr { e }
-| e1 = expr; op = comp_op; e2 = expr { Comp(op, [e1, e2]) }
+| e1 = expr; op = comp_op; e2 = expr { Op(op, [e1; e2]) }
 comp_op:
   LT { Lt }   | GT { Gt }   | EQ { Eq } | LEQ { Leq }
 | GEQ { Geq } | NEQ { Neq } | IN { In } | NOT_IN { NotIn }
-| IS { IS }   | IS_NOT { IsNot }
+| IS { Is }   | IS_NOT { IsNot }
 expr:
   a = atom { a }
-| e1 = expr; BW_OR; e2 = expr { Op(BwOr, [e1, e2]) }
-| e1 = expr; BW_XOR; e2 = expr { Op(BwXOr, [e1, e2]) }
-| e1 = expr; BW_AND; e2 = expr { Op(BwAnd, [e1, e2]) }
-| e1 = expr; LSHIFT; e2 = expr { Op(LShift, [e1, e2]) }
-| e1 = expr; RSHIFT; e2 = expr { Op(RShift, [e1, e2]) }
-| e1 = expr; PLUS; e2 = expr { Op(Plus, [e1, e2]) }
-| e1 = expr; MINUS; e2 = expr { Op(Minus, [e1, e2]) }
-| e1 = expr; TIMES; e2 = expr { Op(Times, [e1, e2]) }
-| e1 = expr; FP_DIV; e2 = expr { Op(FpDiv, [e1, e2]) }
-| e1 = expr; INT_DIV; e2 = expr { Op(IntDiv, [e1, e2]) }
-| e1 = expr; MOD; e2 = expr { Op(Mod, [e1, e2]) }
-| e1 = expr; EXP; e2 = expr { Op(Exp, [e1, e2]) }
+| e1 = expr; BW_OR; e2 = expr { Op(BwOr, [e1; e2]) }
+| e1 = expr; BW_XOR; e2 = expr { Op(BwXor, [e1; e2]) }
+| e1 = expr; BW_AND; e2 = expr { Op(BwAnd, [e1; e2]) }
+| e1 = expr; LSHIFT; e2 = expr { Op(LShift, [e1; e2]) }
+| e1 = expr; RSHIFT; e2 = expr { Op(RShift, [e1; e2]) }
+| e1 = expr; PLUS; e2 = expr { Op(Plus, [e1; e2]) }
+| e1 = expr; MINUS; e2 = expr { Op(Minus, [e1; e2]) }
+| e1 = expr; TIMES; e2 = expr { Op(Times, [e1; e2]) }
+| e1 = expr; FP_DIV; e2 = expr { Op(FpDiv, [e1; e2]) }
+| e1 = expr; INT_DIV; e2 = expr { Op(IntDiv, [e1; e2]) }
+| e1 = expr; MOD; e2 = expr { Op(Mod, [e1; e2]) }
+| e1 = expr; EXP; e2 = expr { Op(Exp, [e1; e2]) }
 | MINUS; e = expr { Op(Neg, [e]) }
 | BW_COMP; e = expr { Op(BwComp, [e]) }
 atom:
-  v = ID { Var i }
+  v = ID { Var v }
 | i = INT { IntLit i }
 | s = STR { StrLit s }
 | TRUE { BoolLit true }
