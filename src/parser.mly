@@ -69,6 +69,7 @@
 %type <Ast.expr> comparison
 %type <Ast.op> comp_op
 %type <Ast.expr> expr
+%type <Ast.stmt> aug_assign
 %type <Ast.expr> primary
 %type <Ast.expr> atom
 %type <Ast.expr> call
@@ -82,7 +83,7 @@ file_input:
 
 (* STATEMENTS *)
 stmt:
-| ss = simple_stmt { ss }
+  ss = simple_stmt { ss }
 | s = compound_stmt { [s] }
 (* simple statements *)
 simple_stmt:
@@ -132,6 +133,7 @@ expr_stmt:
   e = expr { Expr e }
 | c = cond_expr { Expr c }
 | s = ID; ASSIG; e = assignable_expr { Assign(s, e) }
+| a = aug_assign { a }
 assignable_expr:
   e = expr { e }
 | c = cond_expr { c }
@@ -167,6 +169,19 @@ expr:
 | e1 = expr; EXP; e2 = expr { Op(Exp, [e1; e2]) }
 | MINUS; e = expr { Op(Neg, [e]) }
 | BW_COMP; e = expr { Op(BwComp, [e]) }
+aug_assign:
+  v = ID; BW_OR_A; e = expr { Assign(v, Op(BwOr, [Var v; e])) }
+| v = ID; BW_XOR_A; e = expr { Assign(v, Op(BwXor, [Var v; e])) }
+| v = ID; BW_AND_A; e = expr { Assign(v, Op(BwAnd, [Var v; e])) }
+| v = ID; LSHIFT_A; e = expr { Assign(v, Op(LShift, [Var v; e])) }
+| v = ID; RSHIFT_A; e = expr { Assign(v, Op(RShift, [Var v; e])) }
+| v = ID; PLUS_A; e = expr { Assign(v, Op(Plus, [Var v; e])) }
+| v = ID; MINUS_A; e = expr { Assign(v, Op(Minus, [Var v; e])) }
+| v = ID; TIMES_A; e = expr { Assign(v, Op(Times, [Var v; e])) }
+| v = ID; FP_DIV_A; e = expr { Assign(v, Op(FpDiv, [Var v; e])) }
+| v = ID; INT_DIV_A; e = expr { Assign(v, Op(IntDiv, [Var v; e])) }
+| v = ID; MOD_A; e = expr { Assign(v, Op(Mod, [Var v; e])) }
+| v = ID; EXP_A; e = expr { Assign(v, Op(Exp, [Var v; e])) }
 primary:
   a = atom { a }
 | c = call { c }
