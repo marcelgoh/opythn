@@ -15,9 +15,19 @@ let test_lexer () =
               printf "%s" (Token.show !tok);
     | None -> printf "A file must be provided as input.\n"
 
-let test_ast_print () =
-  let prog = [ (Assign("greeting", (StrLit "hi")));
-               (Expr  (Op (Plus, [IntLit 3; IntLit 5]))) ] in
-  printf "%s\n" (Ast.show prog)
+let test_parser () =
+  let parse_exn buffer = try Parser.file_input Lexer.read buffer with
+                    Parser.Error ->
+                      printf "%s: syntax error.\n" (Lexer.print_position buffer);
+                      [] in
+  let opy_code = Fileio.str_of_prog_args () in
+    match opy_code with
+      Some s -> let buffer = Lexing.from_string s in
+                let tree = parse_exn buffer in
+                printf "%s\n" (Ast.show tree)
+    | None   -> printf "A file must be provided as input.\n"
 
-let _ = test_lexer ()
+let _ = printf "************ LEXER OUTPUT ************\n";
+        test_lexer();
+        printf "************ PARSER OUTPUT ************\n";
+        test_parser ()

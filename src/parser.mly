@@ -47,7 +47,7 @@
 %right EXP
 %right LSQUARE LPAREN DOT
 
-%start <Ast.program> file_input
+%start <Ast.stmt list> file_input
 
 %% (* list of production rules *)
 
@@ -57,14 +57,17 @@ file_input:
 
 (* STATEMENTS *)
 stmt:
-  s = simple_stmt { s }
+| s = simple_stmt { s }
 | s = compound_stmt { s }
 (* simple statements *)
-semicolon_stmt:
-  SEMIC; s = small_stmt { s }
+(* semicolon_stmt: *)
+(*   SEMIC; s = small_stmt { s } *)
 simple_stmt:
   (* removed optional semicolon at the end of line for now *)
-  s = small_stmt; semicolon_stmt*; NEWLINE { s }
+  s = small_stmt; NEWLINE { s }
+small_stmts:
+  s = small_stmt { [s] }
+| ss = small_stmts; SEMIC; s = small_stmt { ss @ [s] }
 small_stmt:
   s = expr_stmt { s }
 | s = flow_stmt { s }
@@ -125,7 +128,7 @@ comp_op:
 | GEQ { Geq } | NEQ { Neq } | IN { In } | NOT_IN { NotIn }
 | IS { Is }   | IS_NOT { IsNot }
 expr:
-  a = atom { a }
+  p = primary { p }
 | e1 = expr; BW_OR; e2 = expr { Op(BwOr, [e1; e2]) }
 | e1 = expr; BW_XOR; e2 = expr { Op(BwXor, [e1; e2]) }
 | e1 = expr; BW_AND; e2 = expr { Op(BwAnd, [e1; e2]) }
@@ -140,6 +143,9 @@ expr:
 | e1 = expr; EXP; e2 = expr { Op(Exp, [e1; e2]) }
 | MINUS; e = expr { Op(Neg, [e]) }
 | BW_COMP; e = expr { Op(BwComp, [e]) }
+primary:
+  a = atom { a }
+| c = call { c }
 atom:
   v = ID { Var v }
 | i = INT { IntLit i }
@@ -147,3 +153,13 @@ atom:
 | TRUE { BoolLit true }
 | FALSE { BoolLit false }
 | NONE { None }
+call:
+  (* no optional trailing comma for now *)
+  p = primary; LPAREN; args = argument_list?; RPAREN {
+    match args with
+      Some l -> Call(p, l)
+    | None   -> Call(p, [])
+  }
+argument_list:
+  e = expr { [e] }
+| e = expr; COMMA; rest = argument_list { e :: rest }

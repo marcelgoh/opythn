@@ -7,6 +7,12 @@
   exception Lex_error of string
   exception Indent_error of int * int * int
 
+  (* print position of buffer *)
+  let print_position buffer =
+    let pos = buffer.lex_curr_p in
+    Printf.sprintf "%s:%d:%d" pos.pos_fname pos.pos_lnum
+      (pos.pos_cnum - pos.pos_bol + 1)
+
   (* number of brackets *)
   let num_brackets = ref 0
   (* stack for indentation levels *)
@@ -83,7 +89,7 @@
 
 let integer = '-'? ['1'-'9'] ['0'-'9']* | '-'? '0'*
 let whitespace = [' ' '\t']+
-let newline = '\r' | '\n' | "\r\n"
+let newline = ['\r' '\n']+
 let id = ['a'-'z' 'A'-'Z' '_'] ['a'-'z' 'A'-'Z' '_' '0'-'9']*
 let string_char = [^ '\n' '\'' '"' '\\'] | '\\' _
 

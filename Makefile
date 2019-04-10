@@ -1,7 +1,8 @@
 BUILD = ocamlbuild
 
 FLAGS = -r ${USEFLAGS} ${PKGFLAGS}
-USEFLAGS = -use-ocamlfind -use-menhir -menhir "menhir --external-tokens Token"
+USEFLAGS = -use-ocamlfind -use-menhir -menhir ${MENHIRFLAGS}
+MENHIRFLAGS="menhir --external-tokens Token"
 PKGFLAGS = -pkg extlib -pkg ppx_deriving.show -pkg str
 
 EXT = native
