@@ -7,7 +7,6 @@
 (* basic tokens *)
 %token <string> ID
 %token <int> INT
-%token <string> OP
 %token <string> STR
 %token NEWLINE %token INDENT %token DEDENT %token EOF
 (* keywords *)
@@ -31,8 +30,6 @@
 %token BW_XOR_A %token LSHIFT_A %token RSHIFT_A
 
 (* associativity and precedence *)
-%left NEWLINE
-%left SEMIC
 %left OR
 %left AND
 %nonassoc NOT
