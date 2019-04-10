@@ -47,24 +47,46 @@
 %right EXP
 %right LSQUARE LPAREN DOT
 
-%start <Ast.stmt list> file_input
+(* type declarations *)
+%start <Ast.program> file_input
+%type <Ast.stmt list> stmt
+%type <Ast.stmt list> simple_stmt
+%type <Ast.stmt list> small_stmts
+%type <Ast.stmt> small_stmt
+%type <Ast.stmt> flow_stmt
+%type <Ast.stmt> compound_stmt
+%type <Ast.expr> condition
+%type <Ast.stmt list> else_clause
+%type <Ast.stmt> if_stmt
+%type <Ast.stmt> elif_stmt
+%type <Ast.stmt> while_stmt
+%type <Ast.stmt list> suite
+%type <Ast.stmt list list> deep_suite
+%type <Ast.stmt> expr_stmt
+%type <Ast.expr> assignable_expr
+%type <Ast.expr> cond_expr
+%type <Ast.expr> test
+%type <Ast.expr> comparison
+%type <Ast.op> comp_op
+%type <Ast.expr> expr
+%type <Ast.expr> primary
+%type <Ast.expr> atom
+%type <Ast.expr> call
+%type <Ast.expr list> argument_list
 
 %% (* list of production rules *)
 
 (* start symbols *)
 file_input:
-  ss = stmt*; EOF { ss }
+  ss = stmt*; EOF { List.concat ss }
 
 (* STATEMENTS *)
 stmt:
-| s = simple_stmt { s }
-| s = compound_stmt { s }
+| ss = simple_stmt { ss }
+| s = compound_stmt { [s] }
 (* simple statements *)
-(* semicolon_stmt: *)
-(*   SEMIC; s = small_stmt { s } *)
 simple_stmt:
-  (* removed optional semicolon at the end of line for now *)
-  s = small_stmt; NEWLINE { s }
+  ss = small_stmts; SEMIC?; NEWLINE { ss }
 small_stmts:
   s = small_stmt { [s] }
 | ss = small_stmts; SEMIC; s = small_stmt { ss @ [s] }
@@ -100,6 +122,8 @@ while_stmt:
     While(cond, pos)
   }
 suite:
+  ds = deep_suite { List.concat ds }
+deep_suite:
   s = simple_stmt { [s] }
 | NEWLINE; INDENT; ss = stmt+; DEDENT { ss }
 
@@ -154,7 +178,6 @@ atom:
 | FALSE { BoolLit false }
 | NONE { None }
 call:
-  (* no optional trailing comma for now *)
   p = primary; LPAREN; args = argument_list?; RPAREN {
     match args with
       Some l -> Call(p, l)
