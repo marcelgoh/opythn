@@ -22,12 +22,16 @@ type token =
 | MINUS_A  | TIMES_A  | FP_DIV_A | INT_DIV_A
 | MOD_A    | EXP_A    | BW_AND_A | BW_OR_A
 | BW_XOR_A | LSHIFT_A | RSHIFT_A
+(* pseudo start-symbols *)
+| START_FILE | START_REPL | END_REPL
 [@@deriving show]
 
 let show tok =
   let module S = Str in
   let str =
     match tok with
-      NEWLINE | EOF -> (show_token tok) ^ "\n"
-    | _             -> (show_token tok) ^ " " in
+      START_FILE | NEWLINE | EOF ->
+        (show_token tok) ^ "\n"
+    | _ ->
+        (show_token tok) ^ " " in
   S.global_replace (S.regexp_string "Token.") "" str

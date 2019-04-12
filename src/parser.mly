@@ -28,6 +28,8 @@
 %token MINUS_A  %token TIMES_A  %token FP_DIV_A %token INT_DIV_A
 %token MOD_A    %token EXP_A    %token BW_AND_A %token BW_OR_A
 %token BW_XOR_A %token LSHIFT_A %token RSHIFT_A
+(* pseudo start-symbols *)
+%token START_FILE %token START_REPL %token END_REPL
 
 (* associativity and precedence *)
 %left OR
@@ -45,7 +47,9 @@
 %right LSQUARE LPAREN DOT
 
 (* type declarations *)
-%start <Ast.program> file_input
+%start <Ast.program> input
+%type <Ast.program> file_input
+%type <Ast.program> repl_input
 %type <Ast.stmt list> stmt
 %type <Ast.stmt list> simple_stmt
 %type <Ast.stmt list> small_stmts
@@ -75,8 +79,15 @@
 %% (* list of production rules *)
 
 (* start symbols *)
+input:
+  START_FILE; f = file_input { f }
+| START_REPL; r = repl_input; { r }
 file_input:
   ss = stmt*; EOF { List.concat ss }
+repl_input:
+  NEWLINE { [] }
+| s = simple_stmt { s }
+| s = compound_stmt NEWLINE { [s] }
 
 (* STATEMENTS *)
 stmt:
@@ -122,7 +133,7 @@ while_stmt:
 suite:
   ds = deep_suite { List.concat ds }
 deep_suite:
-  s = simple_stmt { [s] }
+  s = simple_stmt; NEWLINE { [s] }
 | NEWLINE; INDENT; ss = stmt+; DEDENT { ss }
 
 (* EXPRESSIONS *)

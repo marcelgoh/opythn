@@ -154,6 +154,7 @@ rule read_one =
   | '\'' ((string_char | '"')* as s) '\''
                { STR (unescape s) }
   | _          { raise (Lex_error ("Unexpected char: " ^ Lexing.lexeme lexbuf)) }
+  | ";;"       { Queue.add END_REPL read_queue; NEWLINE }
   | eof        { if Stack.top indent_levels <> 0 then (
                    enqueue_dedents read_queue indent_levels 0;
                    Queue.add EOF read_queue;
@@ -174,4 +175,8 @@ and read_line_comment =
     if Queue.is_empty read_queue then
       read_one lexbuf
     else Queue.take read_queue
+  let setup_file_input () =
+    Queue.add START_FILE read_queue
+  let setup_repl_input () =
+    Queue.add START_REPL read_queue
 }
