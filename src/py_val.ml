@@ -1,8 +1,8 @@
 (* Typed Python values *)
 
-type py_val =
+type t =
   Int of int
 | Bool of bool
-| Str of id
-| Fun of (py_val list -> py_val)
+| Str of string
+| Fun of (t list -> t)
 | NoneType

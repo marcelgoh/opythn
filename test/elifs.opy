@@ -1,6 +1,6 @@
 # Test multiple elif expressions
 
-x = 0
+x = 3 if True else 4
 
 if x == 0:
     w += 1

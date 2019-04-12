@@ -3,11 +3,15 @@
 %{
   open Ast
 
+  exception Parse_error of string
+
+  (* build right-leaning tree of IFs from ELIFs *)
   let rec build_if_tree (cond : Ast.expr) (pos : Ast.stmt list) (elifs : Ast.stmt list)
                         (neg : (Ast.stmt list) option) : Ast.stmt =
     match elifs with
       []                  -> If(cond, pos, neg)
     | (If(c, p, _)::rest) -> If(cond, pos, Some([(build_if_tree c p rest neg)]))
+    | (_::rest)           -> raise (Parse_error "Error parsing if-expressions.")
 %}
 
 (* basic tokens *)
@@ -21,7 +25,7 @@
 %token WHILE   %token BREAK  %token CONTINUE
 (* word-like operators *)
 %token AND %token OR %token NOT %token IS %token IN %token NOT_IN %token IS_NOT
-(* symbolic operators TODO: add associativity *)
+(* symbolic operators *)
 %token PLUS    %token MINUS  %token TIMES %token FP_DIV
 %token INT_DIV %token MOD    %token EXP   %token EQ
 %token NEQ     %token LT     %token GT    %token LEQ
@@ -152,7 +156,7 @@ assignable_expr:
   e = expr { e }
 | c = cond_expr { c }
 cond_expr:
-  e1 = test; IF; cond = test; ELSE; e2 = cond_expr {
+  e1 = expr; IF; cond = test; ELSE; e2 = assignable_expr {
     Cond(cond, e1, e2)
   }
 test:
