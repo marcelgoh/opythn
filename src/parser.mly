@@ -2,6 +2,12 @@
 
 %{
   open Ast
+
+  let rec build_if_tree (cond : Ast.expr) (pos : Ast.stmt list) (elifs : Ast.stmt list)
+                        (neg : (Ast.stmt list) option) : Ast.stmt =
+    match elifs with
+      []                  -> If(cond, pos, neg)
+    | (If(c, p, _)::rest) -> If(cond, pos, Some([(build_if_tree c p rest neg)]))
 %}
 
 (* basic tokens *)
@@ -120,7 +126,7 @@ if_stmt:
     pos = suite;
   elifs = elif_stmt*;
   neg = else_clause? {
-    If(cond, List.append pos elifs, neg)
+    build_if_tree cond pos elifs neg
   }
 elif_stmt:
   ELIF; cond = condition; COLON; pos = suite {
