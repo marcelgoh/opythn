@@ -6,3 +6,4 @@ type t =
 | Str of string
 | Fun of (t list -> t)
 | NoneType
+[@@deriving show]
