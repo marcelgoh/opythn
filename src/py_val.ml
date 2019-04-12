@@ -7,3 +7,6 @@ type t =
 | Fun of (t list -> t)
 | NoneType
 [@@deriving show]
+
+let str_of_py_val pv =
+  Str.global_replace (Str.regexp_string "Py_val.") "" (show pv)

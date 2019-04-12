@@ -28,7 +28,10 @@ let run_tests opy_code =
   buffer := Lexing.from_string opy_code; (* reset buffer *)
   Lexer.setup_file_input ();
   let tree = parse !buffer in
-  printf "%s\n" (Ast.show tree)
+  printf "%s\n" (Ast.show tree);
+  printf "************ BYTECODE ************\n";
+  let instrs = Bytecode.compile_prog tree in
+  Bytecode.print_asm instrs
 
 (* quit repl *)
 let quit _ =
@@ -55,9 +58,7 @@ let rec debug () =
   printf "%s\n" (Ast.show tree);
   printf "************ BYTECODE ************\n";
   let instrs = Bytecode.compile_prog tree in
-  for i = 0 to D.length instrs - 1 do
-    printf "%s\n" (Bytecode.show (D.get instrs i))
-  done;
+  Bytecode.print_asm instrs;
   debug ()
 
 (* select mode based on program arguments *)

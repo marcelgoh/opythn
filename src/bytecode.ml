@@ -1,5 +1,6 @@
 (* Bytecode representation and compilation *)
 
+open Printf
 open Ast
 open Py_val
 module D = DynArray
@@ -32,6 +33,28 @@ type t =
 | JUMP_IF_FALSE_OR_POP of (* target : *) int
 | CALL_FUNCTION of (* argc : *) int
 [@@deriving show]
+
+(* pretty printable representation of instruction *)
+let str_of_instr instr =
+  let module S = Str in
+  let str = 
+    match instr with
+      (* instructions with arguments *)
+      STORE_NAME s           -> sprintf "STORE_NAME\t\t\"%s\"" s
+    | LOAD_CONST pv          -> sprintf "LOAD_CONST\t\t%s" (str_of_py_val pv)
+    | LOAD_NAME s            -> sprintf "LOAD_NAME\t\t\"%s\"" s
+    | POP_JUMP_IF_FALSE i    -> sprintf "POP_JUMP_IF_FALSE\t%d" i
+    | JUMP_IF_TRUE_OR_POP i  -> sprintf "JUMP_IF_TRUE_OR_POP\t%d" i
+    | JUMP_IF_FALSE_OR_POP i -> sprintf "JUMP_IF_FALSE_OR_POP\t%d" i
+    | CALL_FUNCTION i        -> sprintf "CALL_FUNCTION\t\t%d" i
+    | _                      -> show instr
+  in S.global_replace (S.regexp_string "Bytecode.") "" str
+
+(* prints a list of instructions in readable format *)
+let print_asm instrs =
+  for i = 0 to D.length instrs - 1 do
+    printf "%d\t%s\n" i (str_of_instr (D.get instrs i))
+  done
 
 (* convert an expression to bytecode and add instructions to array *)
 let rec compile_expr (arr : t D.t) (e : Ast.expr) : unit =
@@ -71,7 +94,7 @@ let rec compile_expr (arr : t D.t) (e : Ast.expr) : unit =
                        | BwXor  -> D.add arr BINARY_BW_XOR
                        | LShift -> D.add arr BINARY_LSHIFT
                        | RShift -> D.add arr BINARY_RSHIFT
-                       | Neg    -> D.add arr UNARY_NEG);
+                       | Neg    -> D.add arr UNARY_NEG)
   | Cond (t,c,e)   -> D.add arr NOP (* TODO: add conditional exprs *)
   | None           -> D.add arr (LOAD_CONST NoneType)
 
