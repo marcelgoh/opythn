@@ -165,6 +165,8 @@ let compile_prog (p : Ast.program) : t D.t =
                iter arr ss in
   let instrs = D.create () in
   iter instrs p;
+(*
   D.add instrs (LOAD_CONST None);
   D.add instrs RETURN_VALUE;
+*)
   instrs

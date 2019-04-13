@@ -45,7 +45,7 @@
 %left OR
 %left AND
 %nonassoc NOT
-(* %left IN NOT_IN IS IS_NOT LT LEQ GT GEQ NEQ EQ *)
+%left IN NOT_IN IS IS_NOT LT LEQ GT GEQ NEQ EQ
 %left BW_OR
 %left BW_XOR
 %left BW_AND
@@ -76,8 +76,6 @@
 %type <Ast.stmt> expr_stmt
 %type <Ast.expr> assignable_expr
 %type <Ast.expr> cond_expr
-%type <Ast.expr> test
-%type <Ast.expr> comparison
 %type <Ast.op> comp_op
 %type <Ast.expr> expr
 %type <Ast.stmt> aug_assign
@@ -121,7 +119,7 @@ compound_stmt:
   s = if_stmt { s }
 | s = while_stmt { s }
 condition:
-  t = test { t }
+  t = expr { t }
 | c = cond_expr { c }
 else_clause:
   ELSE; COLON; s = suite { s }
@@ -150,26 +148,15 @@ deep_suite:
 expr_stmt:
   e = expr { Expr e }
 | c = cond_expr { Expr c }
-(* | t = test { Expr t } *)
 | s = ID; ASSIG; e = assignable_expr { Assign(s, e) }
 | a = aug_assign { a }
 assignable_expr:
   e = expr { e }
 | c = cond_expr { c }
 cond_expr:
-  e1 = expr; IF; cond = test; ELSE; e2 = assignable_expr {
+  e1 = expr; IF; cond = expr; ELSE; e2 = assignable_expr {
     Cond(cond, e1, e2)
   }
-(* | LPAREN; c = cond_expr; RPAREN { c } *)
-test:
-  t1 = test; OR; t2 = test { Op(Or, [t1; t2]) }
-| t1 = test; AND; t2 = test { Op(And, [t1; t2]) }
-| NOT; t = test { Op(Not, [t]) }
-| c = comparison { c }
-(* | LPAREN; t = test; RPAREN { t } *)
-comparison:
-  e = expr { e }
-| e1 = expr; op = comp_op; e2 = expr { Op(op, [e1; e2]) }
 comp_op:
   LT { Lt }   | GT { Gt }   | EQ { Eq } | LEQ { Leq }
 | GEQ { Geq } | NEQ { Neq } | IN { In } | NOT_IN { NotIn }
@@ -190,6 +177,14 @@ expr:
 | e1 = expr; EXP; e2 = expr { Op(Exp, [e1; e2]) }
 | MINUS; e = expr { Op(Neg, [e]) }
 | BW_COMP; e = expr { Op(BwComp, [e]) }
+(* tests *)
+| e1 = expr; OR; e2 = expr { Op(Or, [e1; e2]) }
+| e1 = expr; AND; e2 = expr { Op(And, [e1; e2]) }
+| NOT; e = expr { Op(Not, [e]) }
+(* comparison *)
+| e1 = expr; op = comp_op; e2 = expr { Op(op, [e1; e2]) } %prec EQ
+(* parenthesised expressions *)
+| LPAREN; e = expr; RPAREN { e }
 aug_assign:
   v = ID; BW_OR_A; e = expr { Assign(v, Op(BwOr, [Var v; e])) }
 | v = ID; BW_XOR_A; e = expr { Assign(v, Op(BwXor, [Var v; e])) }
