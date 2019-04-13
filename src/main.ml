@@ -44,9 +44,12 @@ let rec repl () =
   flush stdout;
   let buffer = Lexing.from_channel stdin in
   Lexer.setup_repl_input buffer;
-(*   print_lex buffer; *)
   let tree = parse buffer in
+  printf "************ PARSER OUTPUT ************\n";
   printf "%s\n" (Ast.show tree);
+  printf "************ BYTECODE ************\n";
+  let instrs = Bytecode.compile_prog tree in
+  Bytecode.print_asm instrs;
   repl ()
 
 let rec debug () =
@@ -54,11 +57,8 @@ let rec debug () =
   flush stdout;
   let buffer = Lexing.from_channel stdin in
   Lexer.setup_repl_input buffer;
-  let tree = parse buffer in
-  printf "%s\n" (Ast.show tree);
-  printf "************ BYTECODE ************\n";
-  let instrs = Bytecode.compile_prog tree in
-  Bytecode.print_asm instrs;
+  printf "************ LEXER OUTPUT ************\n";
+  print_lex buffer;
   debug ()
 
 (* select mode based on program arguments *)
@@ -68,7 +68,7 @@ let main () =
     (* start interactive mode *)
     printf "+----------------------------------------------+\n";
     printf "|             OPYTHN INTERACTIVE MODE          |\n";
-    printf "|   Author: Marcel Goh (Release: 11.04.2019)   |\n";
+    printf "|   Author: Marcel Goh (Release: 13.04.2019)   |\n";
     printf "|            Type \"Ctrl-C\" to quit.            |\n";
     printf "+----------------------------------------------+\n";
     flush stdout;

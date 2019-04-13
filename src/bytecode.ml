@@ -135,11 +135,12 @@ let rec compile_stmt (arr : t D.t) (in_loop : bool) (s : Ast.stmt) : unit =
    | While (c, ss)  -> let start_idx = D.length arr in
                        compile_expr arr c;
                        let pop_index = D.length arr in
-                       D.add arr (POP_JUMP_IF_FALSE (-1)); (* dummy 1 *)
+                       D.add arr (POP_JUMP_IF_FALSE (-1)); (* dummy *)
                        List.iter (compile_stmt arr true) ss;
                        D.add arr (JUMP start_idx); (* goto beginning of loop *)
                        let end_idx = D.length arr in
-                       D.set arr pop_index (POP_JUMP_IF_FALSE end_idx); (* backfill 1 *)
+                       D.set arr pop_index (POP_JUMP_IF_FALSE end_idx); (* backfill *)
+                       (* scan over tokens that were added to backfill breaks and continues *)
                        for i = start_idx to end_idx - 1 do
                          match D.get arr i with
                            JUMP t -> if t = -10 then D.set arr i (JUMP end_idx) else
