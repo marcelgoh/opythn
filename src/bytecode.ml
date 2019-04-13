@@ -18,6 +18,7 @@ type t =
 | BINARY_FP_DIV  | BINARY_INT_DIV | BINARY_MOD
 | BINARY_EXP     | BINARY_LSHIFT  | BINARY_RSHIFT
 | BINARY_BW_AND  | BINARY_BW_OR   | BINARY_BW_XOR
+| BINARY_AND     | BINARY_OR      (*** temporary AND and OR operators ***)
 (* binary comparison: TOS = TOS1 <comp> TOS *)
 | COMPARE_EQ     | COMPARE_NEQ    | COMPARE_LT
 | COMPARE_GT     | COMPARE_LEQ    | COMPARE_GEQ
@@ -71,8 +72,8 @@ let rec compile_expr (arr : t D.t) (e : Ast.expr) : unit =
                       D.add arr (CALL_FUNCTION (List.length args))
   | Op (o, args)   -> List.iter (compile_expr arr) args;
                       (match o with
-                         And       (* TODO: add AND and OR *)
-                       | Or     -> D.add arr NOP
+                         And    -> D.add arr BINARY_AND (* TODO: optimise these *)
+                       | Or     -> D.add arr BINARY_OR
                        | Not    -> D.add arr UNARY_NOT
                        | Is     -> D.add arr COMPARE_IS
                        | In     -> D.add arr COMPARE_IN
@@ -119,6 +120,8 @@ let compile_stmt (arr : t D.t) (s : Ast.stmt) : unit =
                      D.add arr (LOAD_CONST None);
                      D.add arr RETURN_VALUE
   | _             -> D.add arr NOP (* TODO: add other statements *)
+(* handle while-loops *)
+(* and compile_loop  *)
 
 (* compile_prog p : Ast.program -> D.t *)
 let compile_prog (p : Ast.program) : t D.t =

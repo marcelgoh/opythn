@@ -15,6 +15,8 @@
 
   (* number of brackets *)
   let num_brackets = ref 0
+  (* newlines are ignored unless we're in REPL mode *)
+  let read_newlines = ref false
   (* stack for indentation levels *)
   let indent_levels = Stack.create ()
   let () = Stack.push 0 indent_levels
@@ -35,7 +37,9 @@
   let count_ws (str : string) : int =
     let chars = List.init (String.length str) (String.get str) in
     (* assumes the string only has tabs and spaces *)
-    let sum_over acc c = if Char.equal c '\t' then acc + 4 else acc + 1 in
+    let sum_over acc c = if Char.equal c '\t' then
+                           acc + 4
+                         else if Char.equal c ' ' then acc + 1 else acc in
     List.fold_left sum_over 0 chars
 
   (* returns the number of numbers in stack greater than n *)
@@ -85,11 +89,15 @@
       incr i;
     done;
     Buffer.contents buf
+
+  (* check if lexbuf is at start of line *)
+  let curr_col l = l.lex_start_p.pos_cnum - l.lex_start_p.pos_bol
+  let is_start_of_line l = (curr_col l = 0)
 }
 
 let integer = '-'? ['1'-'9'] ['0'-'9']* | '-'? '0'*
 let whitespace = [' ' '\t']+
-let newline = ['\r' '\n']+
+let newline = [' ' '\t']* ['\r' '\n']
 let id = ['a'-'z' 'A'-'Z' '_'] ['a'-'z' 'A'-'Z' '_' '0'-'9']*
 let string_char = [^ '\n' '\'' '"' '\\'] | '\\' _
 
@@ -118,22 +126,31 @@ rule read_one =
   | integer    { INT (int_of_string (Lexing.lexeme lexbuf)) }
   | newline    { Lexing.new_line lexbuf;
                  if !num_brackets = 0 then
-                   NEWLINE
+                   if is_start_of_line lexbuf then
+                     if !read_newlines then
+                       (* we're in REPL mode and we need to dedent *)
+                       let topstack = Stack.top indent_levels in
+                       if topstack > 0 then (
+                         enqueue_dedents read_queue indent_levels 0;
+                         Queue.add NEWLINE read_queue;
+                         DEDENT
+                       )
+                       else NEWLINE
+                     else read_one lexbuf
+                   else NEWLINE
                  else read_one lexbuf }
   | id         { let ret_token =
                    let word = Lexing.lexeme lexbuf in
                    (* check for keywords *)
                    try Hashtbl.find keyword_table word
                    with Not_found -> ID word in
-                 if (lexbuf.lex_start_p.pos_cnum = lexbuf.lex_start_p.pos_bol &&
-                     Stack.top indent_levels <> 0) then (
+                 if is_start_of_line lexbuf && Stack.top indent_levels <> 0 then (
                    enqueue_dedents read_queue indent_levels 0;
                    Queue.add ret_token read_queue;
                    DEDENT
                  )
                  else ret_token }
-  | whitespace { if lexbuf.lex_start_p.pos_cnum = lexbuf.lex_start_p.pos_bol &&
-                    !num_brackets = 0 then
+  | whitespace { if is_start_of_line lexbuf && !num_brackets = 0 then
                    (* at tke start of a line, not in bracketed expression *)
                    let count = count_ws (Lexing.lexeme lexbuf) in
                    let topstack = Stack.top indent_levels in
@@ -154,7 +171,6 @@ rule read_one =
   | '\'' ((string_char | '"')* as s) '\''
                { STR (unescape s) }
   | _          { raise (Lex_error ("Unexpected char: " ^ Lexing.lexeme lexbuf)) }
-  | ";;"       { Queue.add END_REPL read_queue; NEWLINE }
   | eof        { if Stack.top indent_levels <> 0 then (
                    enqueue_dedents read_queue indent_levels 0;
                    Queue.add EOF read_queue;
@@ -165,7 +181,8 @@ rule read_one =
 (* handle line comments by ignoring everything until a newline *)
 and read_line_comment =
   parse
-    newline { read_one lexbuf }
+    newline { Lexing.new_line lexbuf;
+              read_one lexbuf }
   | eof     { EOF }
   | _       { read_line_comment lexbuf }
 
@@ -175,8 +192,9 @@ and read_line_comment =
     if Queue.is_empty read_queue then
       read_one lexbuf
     else Queue.take read_queue
-  let setup_file_input () =
+  let setup_file_input lexbuf =
     Queue.add START_FILE read_queue
-  let setup_repl_input () =
-    Queue.add START_REPL read_queue
+  let setup_repl_input lexbuf =
+    Queue.add START_REPL read_queue;
+    read_newlines := true
 }

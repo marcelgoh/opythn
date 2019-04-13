@@ -23,14 +23,14 @@ type token =
 | MOD_A    | EXP_A    | BW_AND_A | BW_OR_A
 | BW_XOR_A | LSHIFT_A | RSHIFT_A
 (* pseudo start-symbols *)
-| START_FILE | START_REPL | END_REPL
+| START_FILE | START_REPL
 [@@deriving show]
 
 let show tok =
   let module S = Str in
   let str =
     match tok with
-      START_FILE | NEWLINE | EOF ->
+      START_FILE | START_REPL | NEWLINE | EOF ->
         (show_token tok) ^ "\n"
     | _ ->
         (show_token tok) ^ " " in

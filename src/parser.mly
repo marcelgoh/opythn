@@ -39,7 +39,7 @@
 %token MOD_A    %token EXP_A    %token BW_AND_A %token BW_OR_A
 %token BW_XOR_A %token LSHIFT_A %token RSHIFT_A
 (* pseudo start-symbols *)
-%token START_FILE %token START_REPL %token END_REPL
+%token START_FILE %token START_REPL
 
 (* associativity and precedence *)
 %left OR
