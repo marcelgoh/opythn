@@ -103,32 +103,67 @@ let rec compile_expr (arr : t D.t) (e : Ast.expr) : unit =
                       let pop_index = D.length arr in
                       D.add arr (POP_JUMP_IF_FALSE (-1)); (* dummy 1 *)
                       compile_expr arr e1;
-                      D.set arr pop_index (POP_JUMP_IF_FALSE (D.length arr + 1)); (* backfill 1 *)
                       let jump_index = D.length arr in
                       D.add arr (JUMP (-1)); (* dummy 2 *)
+                      D.set arr pop_index (POP_JUMP_IF_FALSE (D.length arr)); (* backfill 1 *)
                       compile_expr arr e2;
                       D.set arr jump_index (JUMP (D.length arr)) (* backfill 2 *)
   | None           -> D.add arr (LOAD_CONST None)
 
 (* convert a statement to bytecode and append instructions to array *)
-let compile_stmt (arr : t D.t) (s : Ast.stmt) : unit =
-  match s with
-    Expr e        -> compile_expr arr e;
-                     D.add arr RETURN_VALUE
-  | Assign (s, e) -> compile_expr arr e;
-                     D.add arr (STORE_NAME s);
-                     D.add arr (LOAD_CONST None);
-                     D.add arr RETURN_VALUE
-  | _             -> D.add arr NOP (* TODO: add other statements *)
-(* handle while-loops *)
-(* and compile_loop  *)
+let rec compile_stmt (arr : t D.t) (in_loop : bool) (s : Ast.stmt) : unit =
+  (match s with
+     Expr e         -> compile_expr arr e;
+                       (match e with
+                          Call _ -> D.add arr POP_TOP (* throw away result of call *)
+                        | _      -> ())
+   | Assign (s, e)  -> compile_expr arr e;
+                       D.add arr (STORE_NAME s);
+   | If (c, s1, s2) -> compile_expr arr c;
+                       let pop_index = D.length arr in
+                       D.add arr (POP_JUMP_IF_FALSE (-1)); (* dummy 1 *)
+                       List.iter (compile_stmt arr in_loop) s1;
+                       (match s2 with
+                          Some ss ->
+                            let jump_index = D.length arr in
+                            D.add arr (JUMP (-1)); (* dummy 2 *)
+                            D.set arr pop_index (POP_JUMP_IF_FALSE (D.length arr)); (* backfill 1 *)
+                            List.iter (compile_stmt arr in_loop) ss;
+                            D.set arr jump_index (JUMP (D.length arr)); (* backfill 2 *)
+                        | None ->
+                            D.set arr pop_index (POP_JUMP_IF_FALSE (D.length arr))); (* just backfill 1 *)
+   | While (c, ss)  -> let start_idx = D.length arr in
+                       compile_expr arr c;
+                       let pop_index = D.length arr in
+                       D.add arr (POP_JUMP_IF_FALSE (-1)); (* dummy 1 *)
+                       List.iter (compile_stmt arr true) ss;
+                       D.add arr (JUMP start_idx); (* goto beginning of loop *)
+                       let end_idx = D.length arr in
+                       D.set arr pop_index (POP_JUMP_IF_FALSE end_idx); (* backfill 1 *)
+                       for i = start_idx to end_idx - 1 do
+                         match D.get arr i with
+                           JUMP t -> if t = -10 then D.set arr i (JUMP end_idx) else
+                                     if t = -20 then D.set arr i (JUMP start_idx) else ()
+                         | _      -> ()
+                       done
+   | Break          -> if not in_loop then
+                         raise (Bytecode_error "BREAK statement found outside loop.")
+                       else
+                         D.add arr (JUMP (-10)) (* code -10 indicates break *)
+   | Continue       -> if not in_loop then
+                         raise (Bytecode_error "CONTINUE statement found outside loop.")
+                       else
+                         D.add arr (JUMP (-20))) (* code -20 indicates continue *)
 
 (* compile_prog p : Ast.program -> D.t *)
 let compile_prog (p : Ast.program) : t D.t =
   let rec iter arr stmts =
     match stmts with
       []    -> ()
-    | s::ss -> compile_stmt arr s;
+    | s::ss -> compile_stmt arr false s;
                iter arr ss in
   let instrs = D.create () in
-  iter instrs p; instrs
+  iter instrs p;
+  D.add instrs (LOAD_CONST None);
+  D.add instrs RETURN_VALUE;
+  instrs

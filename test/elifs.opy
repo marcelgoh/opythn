@@ -1,9 +1,10 @@
 # Test multiple elif expressions
 
-x = 3 if True else 4
+#x = 3 if True else 4
 
 if x == 0:
     w += 1
+    print(w)
 elif x == 1:
     x -= 1
 elif x == 0:
