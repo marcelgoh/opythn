@@ -5,7 +5,7 @@ type t =
 | Bool of bool
 | Str of string
 | Fun of (t list -> t)
-| NoneType
+| None
 [@@deriving show]
 
 let str_of_py_val pv =

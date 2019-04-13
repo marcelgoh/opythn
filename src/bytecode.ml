@@ -23,6 +23,8 @@ type t =
 | COMPARE_GT     | COMPARE_LEQ    | COMPARE_GEQ
 | COMPARE_IS     | COMPARE_IN     | COMPARE_NOT_IN
 | COMPARE_IS_NOT
+(* return TOS to caller *)
+| RETURN_VALUE
 (* operations with arguments *)
 | STORE_NAME of (* name : *) string            (* name = TOS *)
 | LOAD_CONST of (* value: *) Py_val.t          (* TOS = value *)
@@ -37,12 +39,13 @@ type t =
 (* pretty printable representation of instruction *)
 let str_of_instr instr =
   let module S = Str in
-  let str = 
+  let str =
     match instr with
       (* instructions with arguments *)
       STORE_NAME s           -> sprintf "STORE_NAME\t\t\"%s\"" s
     | LOAD_CONST pv          -> sprintf "LOAD_CONST\t\t%s" (str_of_py_val pv)
     | LOAD_NAME s            -> sprintf "LOAD_NAME\t\t\"%s\"" s
+    | JUMP i                 -> sprintf "JUMP\t\t\t%d" i
     | POP_JUMP_IF_FALSE i    -> sprintf "POP_JUMP_IF_FALSE\t%d" i
     | JUMP_IF_TRUE_OR_POP i  -> sprintf "JUMP_IF_TRUE_OR_POP\t%d" i
     | JUMP_IF_FALSE_OR_POP i -> sprintf "JUMP_IF_FALSE_OR_POP\t%d" i
@@ -95,16 +98,27 @@ let rec compile_expr (arr : t D.t) (e : Ast.expr) : unit =
                        | LShift -> D.add arr BINARY_LSHIFT
                        | RShift -> D.add arr BINARY_RSHIFT
                        | Neg    -> D.add arr UNARY_NEG)
-  | Cond (t,c,e)   -> D.add arr NOP (* TODO: add conditional exprs *)
-  | None           -> D.add arr (LOAD_CONST NoneType)
+  | Cond (c,e1,e2) -> compile_expr arr c;
+                      let pop_index = D.length arr in
+                      D.add arr (POP_JUMP_IF_FALSE (-1)); (* dummy 1 *)
+                      compile_expr arr e1;
+                      D.set arr pop_index (POP_JUMP_IF_FALSE (D.length arr + 1)); (* backfill 1 *)
+                      let jump_index = D.length arr in
+                      D.add arr (JUMP (-1)); (* dummy 2 *)
+                      compile_expr arr e2;
+                      D.set arr jump_index (JUMP (D.length arr)) (* backfill 2 *)
+  | None           -> D.add arr (LOAD_CONST None)
 
 (* convert a statement to bytecode and append instructions to array *)
 let compile_stmt (arr : t D.t) (s : Ast.stmt) : unit =
   match s with
-    Expr e        -> compile_expr arr e
+    Expr e        -> compile_expr arr e;
+                     D.add arr RETURN_VALUE
   | Assign (s, e) -> compile_expr arr e;
-                     D.add arr (STORE_NAME s)
-  | _      -> D.add arr NOP (* TODO: add other statements *)
+                     D.add arr (STORE_NAME s);
+                     D.add arr (LOAD_CONST None);
+                     D.add arr RETURN_VALUE
+  | _             -> D.add arr NOP (* TODO: add other statements *)
 
 (* compile_prog p : Ast.program -> D.t *)
 let compile_prog (p : Ast.program) : t D.t =
