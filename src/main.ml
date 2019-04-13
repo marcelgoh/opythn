@@ -44,9 +44,9 @@ let rec repl () =
   flush stdout;
   let buffer = Lexing.from_channel stdin in
   Lexer.setup_repl_input buffer;
-  print_lex buffer;
-(*   let tree = parse buffer in *)
-(*   printf "%s\n" (Ast.show tree); *)
+(*   print_lex buffer; *)
+  let tree = parse buffer in
+  printf "%s\n" (Ast.show tree);
   repl ()
 
 let rec debug () =

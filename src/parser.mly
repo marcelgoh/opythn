@@ -54,7 +54,7 @@
 %left PLUS MINUS
 %left TIMES FP_DIV INT_DIV MOD
 %right EXP
-%right LSQUARE LPAREN DOT
+%right LSQUARE LPAREN DOT RPAREN
 
 (* type declarations *)
 %start <Ast.program> input
@@ -150,6 +150,7 @@ deep_suite:
 expr_stmt:
   e = expr { Expr e }
 | c = cond_expr { Expr c }
+(* | t = test { Expr t } *)
 | s = ID; ASSIG; e = assignable_expr { Assign(s, e) }
 | a = aug_assign { a }
 assignable_expr:
@@ -159,11 +160,13 @@ cond_expr:
   e1 = expr; IF; cond = test; ELSE; e2 = assignable_expr {
     Cond(cond, e1, e2)
   }
+(* | LPAREN; c = cond_expr; RPAREN { c } *)
 test:
   t1 = test; OR; t2 = test { Op(Or, [t1; t2]) }
 | t1 = test; AND; t2 = test { Op(And, [t1; t2]) }
 | NOT; t = test { Op(Not, [t]) }
 | c = comparison { c }
+(* | LPAREN; t = test; RPAREN { t } *)
 comparison:
   e = expr { e }
 | e1 = expr; op = comp_op; e2 = expr { Op(op, [e1; e2]) }
