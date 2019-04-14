@@ -18,7 +18,6 @@ type t =
 | BINARY_FP_DIV  | BINARY_INT_DIV | BINARY_MOD
 | BINARY_EXP     | BINARY_LSHIFT  | BINARY_RSHIFT
 | BINARY_BW_AND  | BINARY_BW_OR   | BINARY_BW_XOR
-| BINARY_AND     | BINARY_OR      (*** temporary AND and OR operators ***)
 (* binary comparison: TOS = TOS1 <comp> TOS *)
 | COMPARE_EQ     | COMPARE_NEQ    | COMPARE_LT
 | COMPARE_GT     | COMPARE_LEQ    | COMPARE_GEQ
@@ -70,10 +69,24 @@ let rec compile_expr (arr : t D.t) (e : Ast.expr) : unit =
   | Call (f, args) -> compile_expr arr f;
                       List.iter (compile_expr arr) args;
                       D.add arr (CALL_FUNCTION (List.length args))
+  | Op (And, args) -> (match args with
+                         e1::e2::_ ->
+                           compile_expr arr e1;
+                           let pop_index = D.length arr in
+                           D.add arr (JUMP_IF_FALSE_OR_POP (-1)); (* dummy *)
+                           compile_expr arr e2;
+                           D.set arr pop_index (JUMP_IF_FALSE_OR_POP (D.length arr)) (* backfill *)
+                       | _         -> raise (Bytecode_error "Not enough arguments: AND"))
+  | Op (Or, args)  -> (match args with
+                         e1::e2::_ ->
+                           compile_expr arr e1;
+                           let pop_index = D.length arr in
+                           D.add arr (JUMP_IF_TRUE_OR_POP (-1)); (* dummy *)
+                           compile_expr arr e2;
+                           D.set arr pop_index (JUMP_IF_TRUE_OR_POP (D.length arr)) (* backfill *)
+                       | _         -> raise (Bytecode_error "Not enough arguments: OR"))
   | Op (o, args)   -> List.iter (compile_expr arr) args;
                       (match o with
-                         And    -> D.add arr BINARY_AND (* TODO: optimise these *)
-                       | Or     -> D.add arr BINARY_OR
                        | Not    -> D.add arr UNARY_NOT
                        | Is     -> D.add arr COMPARE_IS
                        | In     -> D.add arr COMPARE_IN
@@ -98,7 +111,8 @@ let rec compile_expr (arr : t D.t) (e : Ast.expr) : unit =
                        | BwXor  -> D.add arr BINARY_BW_XOR
                        | LShift -> D.add arr BINARY_LSHIFT
                        | RShift -> D.add arr BINARY_RSHIFT
-                       | Neg    -> D.add arr UNARY_NEG)
+                       | Neg    -> D.add arr UNARY_NEG
+                       | _      -> raise (Bytecode_error "Invalid operator encountered."))
   | Cond (c,e1,e2) -> compile_expr arr c;
                       let pop_index = D.length arr in
                       D.add arr (POP_JUMP_IF_FALSE (-1)); (* dummy 1 *)
