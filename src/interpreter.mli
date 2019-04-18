@@ -1,12 +1,5 @@
 (* interface for bytecode interpreter *)
 
-open Py_val
-module D = DynArray
-module H = Hashtbl
-
-exception Interpreter_error of string
-
-type scope
-type env
+exception Runtime_error of string
 
 val interpret : Bytecode.code -> unit
