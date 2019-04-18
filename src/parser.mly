@@ -1,8 +1,6 @@
 (* Parser generator for OPythn, for use with menhir *)
 
 %{
-  open Ast
-
   exception Parse_error of string
 
   (* build right-leaning tree of IFs from ELIFs *)

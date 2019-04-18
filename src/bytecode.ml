@@ -1,8 +1,6 @@
 (* Bytecode representation andcompilation *)
 
 open Printf
-open Ast
-open Py_val
 module D = DynArray
 module H = Hashtbl
 

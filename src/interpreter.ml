@@ -1,8 +1,6 @@
 (* bytecode interpreter *)
 
-open Bytecode
 open Printf
-open Py_val
 module D = DynArray
 module H = Hashtbl
 module S = Stack
