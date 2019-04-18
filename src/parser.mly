@@ -17,6 +17,7 @@
 (* basic tokens *)
 %token <string> ID
 %token <int> INT
+%token <float> FLOAT
 %token <string> STR
 %token NEWLINE %token INDENT %token DEDENT %token EOF
 (* keywords *)
@@ -204,6 +205,7 @@ primary:
 atom:
   v = ID { Var v }
 | i = INT { IntLit i }
+| f = FLOAT { FloatLit f }
 | s = STR { StrLit s }
 | TRUE { BoolLit true }
 | FALSE { BoolLit false }

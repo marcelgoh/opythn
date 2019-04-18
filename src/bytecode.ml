@@ -67,6 +67,7 @@ let rec compile_expr (arr : code) (e : Ast.expr) : unit =
   match e with
     Var id         -> D.add arr (LOAD_NAME id)
   | IntLit i       -> D.add arr (LOAD_CONST (Int i))
+  | FloatLit f     -> D.add arr (LOAD_CONST (Float f))
   | BoolLit b      -> D.add arr (LOAD_CONST (Bool b))
   | StrLit s       -> D.add arr (LOAD_CONST (Str s))
   | Call (f, args) -> compile_expr arr f;

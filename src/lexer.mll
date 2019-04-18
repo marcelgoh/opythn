@@ -96,6 +96,7 @@
 }
 
 let integer = '-'? ['1'-'9'] ['0'-'9']* | '-'? '0'*
+let pointfloat = '-'? ['0'-'9']* '.' ['0'-'9'] | ['0'-'9']+ '.'
 let whitespace = [' ' '\t']+
 let newline = [' ' '\t']* ['\r' '\n']
 let id = ['a'-'z' 'A'-'Z' '_'] ['a'-'z' 'A'-'Z' '_' '0'-'9']*
@@ -124,6 +125,7 @@ rule read_one =
   | ">>" { RSHIFT_A }
   | "not in" { NOT_IN } | "is not" { IS_NOT } (* two-word operators *)
   | integer    { INT (int_of_string (Lexing.lexeme lexbuf)) }
+  | pointfloat { FLOAT (float_of_string (Lexing.lexeme lexbuf)) }
   | newline    { Lexing.new_line lexbuf;
                  if !num_brackets = 0 then
                    if is_start_of_line lexbuf then

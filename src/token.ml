@@ -1,7 +1,7 @@
 (* Tokens that are passed from lexer to parser *)
   (* this type has to be named "token", unfortunately *)
 type token =
-  ID of string | INT of int | STR of string
+  ID of string | INT of int | FLOAT of float | STR of string
 | NEWLINE | INDENT | DEDENT | EOF
 (* keywords *)
 | TRUE  | FALSE | NONE

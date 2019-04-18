@@ -12,6 +12,7 @@ type op =
 type expr =
   Var of string
 | IntLit of int
+| FloatLit of float
 | BoolLit of bool
 | StrLit of string
 | Call of expr * expr list

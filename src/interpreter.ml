@@ -28,23 +28,26 @@ let run (c : Bytecode.code) (envr : env) : unit =
        | UNARY_NEG ->
            let tos = S.pop stack in
            (match tos with
-              Int i  -> s_push (Int (-1))
+              Int i   -> s_push (Int (-i))
               (* cast bools to integers *)
-            | Bool b -> if b then s_push (Int (-1))
+            | Float f -> s_push (Float (-.f))
+            | Bool b  -> if b then s_push (Int (-1))
                         else s_push (Int 0)
             | Str _ | Fun _ | None ->
                 raise (Runtime_error "Wrong type: UNARY_NEG"))
        | UNARY_NOT ->
            let tos = S.pop stack in
            (match tos with
-              Int i  -> if i = 0 then s_push (Bool true)
-                        else s_push (Bool false)
-            | Bool b -> if b then s_push (Bool false)
-                        else s_push (Bool true)
-            | Str s  -> if s = ""  then s_push (Bool true)
-                        else s_push (Bool false)
-            | Fun _  -> s_push (Bool false)
-            | None   -> s_push (Bool true))
+              Int i   -> if i = 0 then s_push (Bool true)
+                         else s_push (Bool false)
+            | Float f -> if f = 0.0 then s_push (Bool true)
+                         else s_push (Bool false)
+            | Bool b  -> if b then s_push (Bool false)
+                         else s_push (Bool true)
+            | Str s   -> if s = ""  then s_push (Bool true)
+                         else s_push (Bool false)
+            | Fun _   -> s_push (Bool false)
+            | None    -> s_push (Bool true))
        | UNARY_BW_COMP
        | BINARY_ADD
        | BINARY_SUB
