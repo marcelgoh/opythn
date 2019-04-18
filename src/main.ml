@@ -31,7 +31,8 @@ let run_tests opy_code =
   printf "%s\n" (Ast.show tree);
   printf "************ BYTECODE ************\n";
   let instrs = Bytecode.compile_prog tree in
-  Bytecode.print_asm instrs
+  Bytecode.print_asm instrs;
+  Interpreter.interpret instrs
 
 (* quit repl *)
 let quit _ =

@@ -36,6 +36,9 @@ type t =
 | CALL_FUNCTION of (* argc : *) int
 [@@deriving show]
 
+(* alias for a DynArray of Bytecode.t *)
+type code = t D.t
+
 (* pretty printable representation of instruction *)
 let str_of_instr instr =
   let module S = Str in
@@ -60,7 +63,7 @@ let print_asm instrs =
   done
 
 (* convert an expression to bytecode and add instructions to array *)
-let rec compile_expr (arr : t D.t) (e : Ast.expr) : unit =
+let rec compile_expr (arr : code) (e : Ast.expr) : unit =
   match e with
     Var id         -> D.add arr (LOAD_NAME id)
   | IntLit i       -> D.add arr (LOAD_CONST (Int i))
@@ -125,7 +128,7 @@ let rec compile_expr (arr : t D.t) (e : Ast.expr) : unit =
   | None           -> D.add arr (LOAD_CONST None)
 
 (* convert a statement to bytecode and append instructions to array *)
-let rec compile_stmt (arr : t D.t) (in_loop : bool) (s : Ast.stmt) : unit =
+let rec compile_stmt (arr : code) (in_loop : bool) (s : Ast.stmt) : unit =
   (match s with
      Expr e         -> compile_expr arr e;
                        (match e with
@@ -164,14 +167,14 @@ let rec compile_stmt (arr : t D.t) (in_loop : bool) (s : Ast.stmt) : unit =
    | Break          -> if not in_loop then
                          raise (Bytecode_error "BREAK statement found outside loop.")
                        else
-                         D.add arr (JUMP (-10)) (* code -10 indicates break *)
+                         D.add arr (JUMP (-10)) (* -10 indicates break *)
    | Continue       -> if not in_loop then
                          raise (Bytecode_error "CONTINUE statement found outside loop.")
                        else
-                         D.add arr (JUMP (-20))) (* code -20 indicates continue *)
+                         D.add arr (JUMP (-20))) (* -20 indicates continue *)
 
 (* compile_prog p : Ast.program -> D.t *)
-let compile_prog (p : Ast.program) : t D.t =
+let compile_prog (p : Ast.program) : code =
   let rec iter arr stmts =
     match stmts with
       []    -> ()
