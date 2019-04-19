@@ -1,6 +1,7 @@
 (* bytecode interpreter *)
 
 open Printf
+open Py_val
 module D = DynArray
 module H = Hashtbl
 module S = Stack
@@ -10,6 +11,32 @@ exception Type_error
 
 type scope = (string, Py_val.t) H.t
 type env = scope list
+
+(* type conversion functions *)
+let as_bool = function
+  Int i  -> i <> 0
+| Bool b -> b
+| Float f -> f <> 0.0
+| Str s -> s <> ""
+| Fun f -> true
+| None -> false
+
+let as_int = function
+  Int i  -> i
+| Bool b -> if b then 1 else 0
+| Float _ | Str _ | Fun _ | None ->
+    raise Type_error
+
+let as_float = function
+  Int i   -> float_of_int i
+| Float f -> f
+| Bool b  -> if b then 1.0 else 0.0
+| Str _ | Fun _ | None ->
+    raise Type_error
+
+let is_float = function
+| Float f -> true
+| _       -> false
 
 (* run code on virtual stack machine *)
 let run (c : Bytecode.code) (envr : env) : unit =
@@ -26,74 +53,48 @@ let run (c : Bytecode.code) (envr : env) : unit =
        | POP_TOP -> S.pop stack |> ignore
        | UNARY_NEG ->
            let tos = S.pop stack in
-           (match tos with
-              Int i   -> s_push (Int (-i))
-              (* cast bools to integers *)
-            | Float f -> s_push (Float (-.f))
-            | Bool b  -> if b then s_push (Int (-1))
-                        else s_push (Int 0)
-            | Str _ | Fun _ | None ->
-                raise (Runtime_error "Wrong type: UNARY_NEG"))
+           (try if is_float tos then
+                  s_push (Float (-. (as_float tos)))
+                else
+                  s_push (Int (- (as_int tos)))
+            with Type_error -> raise (Runtime_error "Wrong type: UNARY_NEG"))
        | UNARY_NOT ->
-           let tos = S.pop stack in
-           (match tos with
-              Int i   -> if i = 0 then s_push (Bool true)
-                         else s_push (Bool false)
-            | Float f -> if f = 0.0 then s_push (Bool true)
-                         else s_push (Bool false)
-            | Bool b  -> if b then s_push (Bool false)
-                         else s_push (Bool true)
-            | Str s   -> if s = ""  then s_push (Bool true)
-                         else s_push (Bool false)
-            | Fun _   -> s_push (Bool false)
-            | None    -> s_push (Bool true))
+           s_push (Bool (not (as_bool (S.pop stack))))
        | UNARY_BW_COMP ->
-           let tos = S.pop stack in
-           (match tos with
-              Int i  -> s_push (Int (lnot i))
-            | Bool b -> if b then s_push (Int (lnot 1))
-                        else s_push (Int (lnot 0))
-            | Float _ | Str _ | Fun _ | None ->
-                raise (Runtime_error "Wrong type: UNARY_BW_COMP"))
+           (try s_push (Int (lnot (as_int (S.pop stack))))
+            with Type_error -> raise (Runtime_error "Wrong type: UNARY_BW_COMP"))
        | BINARY_ADD ->
            let tos = S.pop stack in
            let tos1 = S.pop stack in
-           begin try
-             (match tos1 with
-                Int i1   -> (match tos with
-                               Int i2   -> s_push (Int (i1 + i2))
-                             | Bool b2  -> if b2 then s_push (Int (i1 + 1))
-                                           else s_push (Int i1)
-                             | Float f2 -> s_push (Float (float_of_int i1 +. f2))
-                             | Str _ | Fun _ | None ->
-                                 raise Type_error)
-              | Float f1 -> (match tos with
-                               Int i2   -> s_push (Float (f1 +. float_of_int i2))
-                             | Bool b2  -> if b2 then s_push (Float (f1 +. 1.0))
-                                           else s_push (Float f1)
-                             | Float f2 -> s_push (Float (f1 +. f2))
-                             | Str _ | Fun _ | None ->
-                                 raise Type_error)
-              | Bool b1  -> (match tos with
-                               Int i2   -> if b1 then s_push (Int (i2 + 1))
-                                           else s_push (Int i2)
-                             | Bool b2  -> if b1 && b2 then s_push (Int 2)
-                                           else if not b1 && not b2 then s_push (Int 0)
-                                                else s_push (Int 1)
-                             | Float f2 -> if b1 then s_push (Float (1.0 +. f2))
-                                           else s_push (Float f2)
-                             | Str _ | Fun _ | None ->
-                                 raise Type_error)
-              | Str s1   -> (match tos with
-                               Str s2   -> s_push (Str (s1 ^ s2))
-                             | Int _ | Bool _ | Float _ | Fun _ | None ->
-                                 raise Type_error)
-              | Fun _ | None ->
-                  raise Type_error)
-           with Type_error -> raise (Runtime_error "Type mismatch: BINARY_ADD") end
-       | BINARY_SUB
-       | BINARY_MULT
-       | BINARY_FP_DIV
+           (try
+              (match (tos1, tos) with
+                 (Str s, Str t) -> s_push (Str (s ^ t))
+               | _              -> if is_float tos1 || is_float tos then
+                                     s_push (Float ((as_float tos1) +. (as_float tos)))
+                                   else
+                                     s_push (Int ((as_int tos1) + (as_int tos))))
+            with Type_error -> raise (Runtime_error "Type mismatch: BINARY_ADD"))
+       | BINARY_SUB ->
+           let tos = S.pop stack in
+           let tos1 = S.pop stack in
+           (try if is_float tos1 || is_float tos then
+                  s_push (Float ((as_float tos1) -. (as_float tos)))
+                else
+                  s_push (Int ((as_int tos1) - (as_int tos)))
+             with Type_error -> raise (Runtime_error "Type mismatch: BINARY_SUB"))
+       | BINARY_MULT ->
+           let tos = S.pop stack in
+           let tos1 = S.pop stack in
+           (try if is_float tos1 || is_float tos then
+                  s_push (Float ((as_float tos1) *. (as_float tos)))
+                else
+                  s_push (Int ((as_int tos1) - (as_int tos)))
+            with Type_error -> raise (Runtime_error "Type mismatch: BINARY_MULT"))
+       | BINARY_FP_DIV ->
+           let tos = S.pop stack in
+           let tos1 = S.pop stack in
+           (try s_push (Float ((as_float tos1) /. (as_float tos)))
+            with Type_error -> raise (Runtime_error "Type mismatch: BINARY_FP_DIV"))
        | BINARY_INT_DIV
        | BINARY_MOD
        | BINARY_EXP
