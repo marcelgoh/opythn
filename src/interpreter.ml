@@ -35,8 +35,16 @@ let as_float = function
     raise Type_error
 
 let is_float = function
-| Float f -> true
+  Float _ -> true
 | _       -> false
+
+let is_int = function
+  Int _ -> true
+| _     -> false
+
+let is_str = function
+  Str _ -> true
+| _     -> false
 
 (* python modulo operator *)
 let rec int_exp x n =
@@ -45,6 +53,55 @@ let rec int_exp x n =
     let x' = int_exp x (n / 2) in
     if n mod 2 = 0 then x' * x'
     else x * x' * x'
+
+(* comparison functions -- TODO: make these better/work with objects *)
+let eq pv1 pv2 = (* uses OCaml's structural equality *)
+  if is_float pv1 || is_float pv2 then
+    as_float pv1 = as_float pv2
+  else if is_int pv1 || is_int pv2 then
+         as_int pv1 = as_int pv2
+       else
+         match (pv1, pv2) with
+           (Str s1, Str s2) -> s1 = s2
+         | (None, None) -> true
+         | _ -> raise Type_error
+
+let is pv1 pv2 = (* uses OCaml's physical equality *)
+  if is_float pv1 || is_float pv2 then
+    as_float pv1 == as_float pv2
+  else if is_int pv1 || is_int pv2 then
+         as_int pv1 == as_int pv2
+       else
+         match (pv1, pv2) with
+           (Str s1, Str s2) -> s1 == s2
+         | (None, None) -> true
+         | _ -> raise Type_error
+
+let lt pv1 pv2 = (* uses OCaml's structural comparison *)
+  if is_float pv1 || is_float pv2 then
+    as_float pv1 < as_float pv2
+  else if is_int pv1 || is_int pv2 then
+         as_int pv1 < as_int pv2
+       else
+         match (pv1, pv2) with
+           (Str s1, Str s2) -> s1 < s2
+         | (None, None) -> true
+         | _ -> raise Type_error
+
+let py_in pv1 pv2 =
+  match pv2 with
+    Int _ | Float _ | Bool _ | Str _ | Fun _ | None ->
+      raise Type_error (* not iterable *)
+
+(* environment functions *)
+let rec lookup envr id =
+  match envr with
+    [] ->
+      raise (Runtime_error (Printf.sprintf "Variable \"%s\" not found: LOAD_NAME" id))
+  | e::es ->
+      (match H.find_opt e id with
+         Some pv -> pv
+       | None -> lookup es id)
 
 (* run code on virtual stack machine *)
 let run (c : Bytecode.code) (envr : env) =
@@ -96,7 +153,7 @@ let run (c : Bytecode.code) (envr : env) =
            (try if is_float tos1 || is_float tos then
                   s_push (Float ((as_float tos1) *. (as_float tos)))
                 else
-                  s_push (Int ((as_int tos1) - (as_int tos)))
+                  s_push (Int ((as_int tos1) * (as_int tos)))
             with Type_error -> raise (Runtime_error "Type mismatch: BINARY_MULT"))
        | BINARY_FP_DIV ->
            let tos = S.pop stack in
@@ -155,25 +212,69 @@ let run (c : Bytecode.code) (envr : env) =
            let tos1 = S.pop stack in
            (try s_push (Int ((as_int tos1) lxor (as_int tos)))
             with Type_error -> raise (Runtime_error "Type mismatch: BINARY_BW_XOR"))
-       | LOAD_CONST pv -> s_push pv (* temporary position *)
-       | COMPARE_EQ
-       | COMPARE_NEQ
-       | COMPARE_LT
-       | COMPARE_GT
-       | COMPARE_LEQ
-       | COMPARE_GEQ
-       | COMPARE_IS
-       | COMPARE_IN
-       | COMPARE_NOT_IN
-       | COMPARE_IS_NOT
-       | RETURN_VALUE
-       | STORE_NAME _
-       | LOAD_NAME _
-       | JUMP _
-       | POP_JUMP_IF_FALSE _
-       | JUMP_IF_TRUE_OR_POP _
-       | JUMP_IF_FALSE_OR_POP _
-       | CALL_FUNCTION _ -> printf "Instruction not yet implemented.\n"
+       | COMPARE_EQ ->
+           let tos = S.pop stack in
+           let tos1 = S.pop stack in
+           (try s_push (Bool (eq tos1 tos))
+            with Type_error -> raise (Runtime_error "Type mismatch: COMPARE_EQ"))
+       | COMPARE_NEQ ->
+           let tos = S.pop stack in
+           let tos1 = S.pop stack in
+           (try s_push (Bool (not (eq tos1 tos)))
+            with Type_error -> raise (Runtime_error "Type mismatch: COMPARE_NEQ"))
+       | COMPARE_LT ->
+           let tos = S.pop stack in
+           let tos1 = S.pop stack in
+           (try s_push (Bool (lt tos1 tos))
+            with Type_error -> raise (Runtime_error "Type mismatch: COMPARE_LT"))
+       | COMPARE_GT ->
+           let tos = S.pop stack in
+           let tos1 = S.pop stack in
+           (try s_push (Bool (lt tos tos1)) (* switch order and call lt *)
+            with type_error -> raise (Runtime_error "type mismatch: compare_gt"))
+       | COMPARE_LEQ ->
+           let tos = S.pop stack in
+           let tos1 = S.pop stack in
+           (try s_push (Bool (not (lt tos tos1))) (* not gt *)
+            with Type_error -> raise (Runtime_error "Type mismatch: COMPARE_LEQ"))
+       | COMPARE_GEQ ->
+           let tos = S.pop stack in
+           let tos1 = S.pop stack in
+           (try s_push (Bool (not (lt tos1 tos))) (* not lt *)
+            with Type_error -> raise (Runtime_error "Type mismatch: COMPARE_LEQ"))
+       | COMPARE_IS ->
+           let tos = S.pop stack in
+           let tos1 = S.pop stack in
+           (try s_push (Bool (is tos1 tos))
+            with Type_error -> raise (Runtime_error "Type mismatch: COMPARE_IS"))
+       | COMPARE_IN ->
+           let tos = S.pop stack in
+           let tos1 = S.pop stack in
+           (try s_push (Bool (py_in tos1 tos))
+            with Type_error -> raise (Runtime_error "Type mismatch: COMPARE_IN"))
+       | COMPARE_NOT_IN ->
+           let tos = S.pop stack in
+           let tos1 = S.pop stack in
+           (try s_push (Bool (not (py_in tos1 tos)))
+            with Type_error -> raise (Runtime_error "Type mismatch: COMPARE_NOT_IN"))
+       | COMPARE_IS_NOT ->
+           let tos = S.pop stack in
+           let tos1 = S.pop stack in
+           (try s_push (Bool (not (is tos1 tos)))
+            with Type_error -> raise (Runtime_error "Type mismatch: COMPARE_IS_NOT"))
+       | RETURN_VALUE -> () (* TODO *)
+       | STORE_NAME _ -> () (* TODO *)
+       | LOAD_CONST pv -> s_push pv
+       | LOAD_NAME id -> s_push @@ lookup envr id
+       | JUMP t -> next := t
+       | POP_JUMP_IF_FALSE t -> if as_bool (S.pop stack) then next := t else ()
+       | JUMP_IF_TRUE_OR_POP t ->
+           if as_bool (S.top stack) then next := t
+           else S.pop stack |> ignore
+       | JUMP_IF_FALSE_OR_POP t ->
+           if not (as_bool (S.top stack)) then next := t
+           else S.pop stack |> ignore
+       | CALL_FUNCTION _ -> ()
       );
        loop !next in
   (* start interpreting from the top of instructions *)
