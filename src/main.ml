@@ -70,7 +70,7 @@ let main () =
     (* start interactive mode *)
     printf "+----------------------------------------------+\n";
     printf "|             OPYTHN INTERACTIVE MODE          |\n";
-    printf "|   Author: Marcel Goh (Release: 13.04.2019)   |\n";
+    printf "|   Author: Marcel Goh (Release: 20.04.2019)   |\n";
     printf "|            Type \"Ctrl-C\" to quit.            |\n";
     printf "+----------------------------------------------+\n";
     flush stdout;

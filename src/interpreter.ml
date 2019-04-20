@@ -295,7 +295,9 @@ let run (c : Bytecode.code) (envr : env) =
 let interpret (c : Bytecode.code) : unit =
   (* initialise scopes -- two for now *)
   let (built_in_s : scope) = H.create 5 in
-  H.add built_in_s "print" (Fun Built_in.print);
+  H.add built_in_s "print" (Fun Built_in.print_ln);
+  H.add built_in_s "input" (Fun Built_in.input);
+  H.add built_in_s "int" (Fun Built_in.int_cast);
   let (global_s : scope) = H.create 5 in
   let envr = [global_s; built_in_s] in
   let s = run c envr in
