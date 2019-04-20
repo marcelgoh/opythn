@@ -263,18 +263,29 @@ let run (c : Bytecode.code) (envr : env) =
            (try s_push (Bool (not (is tos1 tos)))
             with Type_error -> raise (Runtime_error "Type mismatch: COMPARE_IS_NOT"))
        | RETURN_VALUE -> () (* TODO *)
-       | STORE_NAME _ -> () (* TODO *)
+       | STORE_NAME id ->
+           let tos = S.pop stack in
+           let scp = List.hd envr in
+           H.replace scp id tos
        | LOAD_CONST pv -> s_push pv
        | LOAD_NAME id -> s_push @@ lookup envr id
        | JUMP t -> next := t
-       | POP_JUMP_IF_FALSE t -> if as_bool (S.pop stack) then next := t else ()
+       | POP_JUMP_IF_FALSE t -> if as_bool (S.pop stack) then () else next := t
        | JUMP_IF_TRUE_OR_POP t ->
            if as_bool (S.top stack) then next := t
            else S.pop stack |> ignore
        | JUMP_IF_FALSE_OR_POP t ->
            if not (as_bool (S.top stack)) then next := t
            else S.pop stack |> ignore
-       | CALL_FUNCTION _ -> ()
+       | CALL_FUNCTION argc ->
+           let arglist = ref [] in
+           for _ = 0 to argc - 1 do
+             arglist := (S.pop stack) :: !arglist
+           done;
+           let retval = match S.pop stack with
+             Fun f -> f !arglist
+           | _     -> raise (Runtime_error "Tried to apply non-function object: CALL_FUNCTION") in
+           s_push retval
       );
        loop !next in
   (* start interpreting from the top of instructions *)
