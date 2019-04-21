@@ -31,7 +31,7 @@ let run_tests opy_code =
   let instrs = Bytecode.compile_prog tree in
   Bytecode.print_asm instrs;
   printf "************ CONSOLE OUTPUT ************\n";
-  Interpreter.interpret instrs
+  Interpreter.interpret instrs @@ Interpreter.init_env ()
 
 (* quit repl *)
 let quit _ =
@@ -39,7 +39,7 @@ let quit _ =
   exit 0
 
 (* read-eval-print loop *)
-let rec repl () =
+let rec repl envr =
   printf "]=> ";
   flush stdout;
   let buffer = Lexing.from_channel stdin in
@@ -51,8 +51,8 @@ let rec repl () =
   let instrs = Bytecode.compile_prog tree in
   Bytecode.print_asm instrs;
   printf "************ CONSOLE OUTPUT ************\n";
-  Interpreter.interpret instrs;
-  repl ()
+  Interpreter.interpret instrs envr;
+  repl envr
 
 let rec debug () =
   printf "DEBUG]=> ";
@@ -74,7 +74,8 @@ let main () =
     printf "|            Type \"Ctrl-C\" to quit.            |\n";
     printf "+----------------------------------------------+\n";
     flush stdout;
-    repl ()
+    let envr = Interpreter.init_env () in
+    repl envr
   )
   else
     if Sys.argv.(1) = "-debug" then (

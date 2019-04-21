@@ -292,15 +292,19 @@ let run (c : Bytecode.code) (envr : env) =
   loop 0
 
 (* interpret bytecode instructions *)
-let interpret (c : Bytecode.code) : unit =
+let interpret c envr =
+  let s = run c envr in
+  if not @@ S.is_empty s then
+    Built_in.print_ln [S.pop s] |> ignore
+  else ()
+
+(* create a new environment and fill it with built-ins *)
+let init_env () =
   (* initialise scopes -- two for now *)
   let (built_in_s : scope) = H.create 5 in
   H.add built_in_s "print" (Fun Built_in.print_ln);
   H.add built_in_s "input" (Fun Built_in.input);
   H.add built_in_s "int" (Fun Built_in.int_cast);
   let (global_s : scope) = H.create 5 in
-  let envr = [global_s; built_in_s] in
-  let s = run c envr in
-  while not (S.is_empty s) do
-    printf "%s\n" (str_of_py_val (S.pop s));
-  done
+  [global_s; built_in_s]
+
