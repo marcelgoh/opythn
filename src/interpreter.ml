@@ -291,7 +291,7 @@ let run (c : Bytecode.code) (envr : env) =
   (* start interpreting from the top of instructions *)
   loop 0
 
-(* interpret bytecode instructions *)
+(* interpret bytecode instructions, printing result when appropriate *)
 let interpret c envr =
   let s = run c envr in
   if not @@ S.is_empty s then

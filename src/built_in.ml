@@ -9,10 +9,14 @@ exception Built_in_error of string
  * Py_val.t list -> Py_val.t
  *)
 
-let rec print args =
+let print args =
+  let rec print' with_space args =
   match args with
     []      -> None
   | pv::pvs ->
+      if with_space then
+        printf " "
+      else ();
       (match pv with
          Int i   -> printf "%d" i
        | Float f -> printf "%f" f
@@ -20,8 +24,8 @@ let rec print args =
        | Str s   -> printf "%s" s
        | Fun f   -> printf "<function>"
        | None    -> printf "None");
-      printf " ";
-      print pvs
+      print' true pvs in
+  print' false args
 
 (* print() *)
 let print_ln args =
