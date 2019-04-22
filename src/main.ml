@@ -33,6 +33,14 @@ let run_tests opy_code =
   printf "************ CONSOLE OUTPUT ************\n";
   Interpreter.interpret instrs @@ Interpreter.init_env ()
 
+(* normal file input *)
+let from_file opy_code =
+  let buffer = Lexing.from_string opy_code in
+  Lexer.setup_file_input buffer;
+  let tree = parse buffer in
+  let instrs = Bytecode.compile_prog tree in
+  Interpreter.interpret instrs @@ Interpreter.init_env ()
+
 (* quit repl *)
 let quit _ =
   printf "\nIch sterbe.\n";
@@ -84,7 +92,7 @@ let main () =
     else
       (* interpret from file *)
       match Fileio.str_of_prog_args () with
-        Some s -> run_tests s
+        Some s -> from_file s
       | None   -> printf "Failed to read from file.\n"
 
 let () = main ()
