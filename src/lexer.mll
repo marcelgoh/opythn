@@ -166,7 +166,8 @@ rule read_one =
                           )
                           else read_one lexbuf (* ignore when indentation equal *)
                  else read_one lexbuf } (* ignore when not at start of line *)
-  | '#'        { read_line_comment lexbuf }
+  | '#'        { let blank = is_start_of_line lexbuf in
+                 read_line_comment blank lexbuf }
   (* strings *)
   | '"' ((string_char | '\'')* as s) '"'
                { STR (unescape s) }
@@ -181,12 +182,20 @@ rule read_one =
                  else EOF }
 
 (* handle line comments by ignoring everything until a newline *)
-and read_line_comment =
+and read_line_comment completely_blank =
   parse
-    newline { Lexing.new_line lexbuf;
-              read_one lexbuf }
-  | eof     { EOF }
-  | _       { read_line_comment lexbuf }
+    newline    { Lexing.new_line lexbuf;
+                 (* behaviour depends on if line is fully blank *)
+                 if completely_blank then
+                   read_one lexbuf
+                 else NEWLINE }
+  | eof        { if Stack.top indent_levels <> 0 then (
+                   enqueue_dedents read_queue indent_levels 0;
+                   Queue.add EOF read_queue;
+                   DEDENT
+                 )
+                 else EOF }
+  | _       { read_line_comment completely_blank lexbuf }
 
 {
   let read lexbuf =
