@@ -32,3 +32,6 @@ _build/
 *.log
 *.gz
 *.sty
+
+# Test output
+test/*.txt
