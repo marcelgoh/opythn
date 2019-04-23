@@ -19,7 +19,8 @@ let print args =
       else ();
       (match pv with
          Int i   -> printf "%d" i
-       | Float f -> printf "%f" f
+       | Float f -> let str = sprintf "%f" f in
+                    printf "%s" (Str.global_replace (Str.regexp "0*$") "" str)
        | Bool b  -> if b then printf "True" else printf "False"
        | Str s   -> printf "%s" s
        | Fun f   -> printf "<function>"
@@ -54,3 +55,26 @@ let int_cast args =
     | Fun _ | None ->
         raise (Built_in_error "Failed typecast: INT_CAST()")
 
+(* round() *)
+let round args =
+  if List.length args <> 2 then
+    raise (Built_in_error "Exactly two arguments expected: ROUND()")
+  else
+  let (num, digits) = (List.hd args, List.hd @@ List.tl args) in
+  let n = match num with
+            Int i   -> float_of_int i
+          | Bool b  -> if b then 1.0 else 0.0
+          | Float f -> f
+          | Str _ | Fun _ | None ->
+              raise (Built_in_error "Cannot round non-numeric type: ROUND()")
+  in
+  let d = match digits with
+            Int i  -> i
+          | Bool b -> if b then 1 else 0
+          | Float _ | Str _ | Fun _ | None ->
+              raise (Built_in_error "Precision must be integer: ROUND()")
+  in
+  (* round to nearest integer *)
+  let round' x = floor (x +. 0.5) in
+  let factor = 10.0 ** (float_of_int d) in
+  Float ((round' (n *. factor)) /. (factor))

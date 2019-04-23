@@ -166,26 +166,37 @@ let run (c : Bytecode.code) (envr : env) =
            (try if is_float tos1 || is_float tos then
                   s_push (Float (floor ((as_float tos1) /. (as_float tos))))
                 else
-                  s_push (Int ((as_int tos1) / (as_int tos)))
+                  s_push (Int (int_of_float (floor ((as_float tos1) /. (as_float tos)))))
             with Type_error -> raise (Runtime_error "Type mismatch: BINARY_INT_DIV"))
        | BINARY_MOD ->
            let tos = S.pop stack in
            let tos1 = S.pop stack in
            (try if is_float tos1 || is_float tos then
                   (* OPythn modulo differs from in OCaml *)
-                  let r = mod_float (as_float tos1) (as_float tos) in
-                  let ans = if r < 0.0 then r +. (as_float tos) else r in
+                  let quot = (floor ((as_float tos1) /. (as_float tos))) in
+                  let ans = (as_float tos1) -. quot *. (as_float tos) in
                   s_push (Float ans)
                 else let r = (as_int tos1) mod (as_int tos) in
-                     let ans = if r < 0 then r + (as_int tos) else r in
-                     s_push (Int ans)
+                  let quot = int_of_float (floor ((as_float tos1) /. (as_float tos))) in
+                  let ans = (as_int tos1) - quot * (as_int tos) in
+                  s_push (Int ans)
             with Type_error -> raise (Runtime_error "Type mismatch: BINARY_MOD"))
        | BINARY_EXP ->
            let tos = S.pop stack in
            let tos1 = S.pop stack in
            (try if is_float tos1 || is_float tos then
                   s_push (Float ((as_float tos1) ** (as_float tos)))
-                else s_push (Int (int_exp (as_int tos1) (as_int tos)))
+                else
+                  if as_int tos < 0 then
+                    if as_int tos1 < 0 then
+                      s_push (Float (-.(1.0 /. float_of_int ((int_exp (as_int tos1) (as_int tos))))))
+                    else
+                      s_push (Float (1.0 /. float_of_int ((int_exp (as_int tos1) (as_int tos)))))
+                  else
+                    if as_int tos1 < 0 then
+                      s_push (Int (-(int_exp (as_int tos1) (as_int tos))))
+                    else
+                      s_push (Int (int_exp (as_int tos1) (as_int tos)))
             with Type_error -> raise (Runtime_error "Type mismatch: BINARY_EXP"))
        | BINARY_LSHIFT ->
            let tos = S.pop stack in
@@ -305,6 +316,7 @@ let init_env () =
   H.add built_in_s "print" (Fun Built_in.print_ln);
   H.add built_in_s "input" (Fun Built_in.input);
   H.add built_in_s "int" (Fun Built_in.int_cast);
+  H.add built_in_s "round" (Fun Built_in.round);
   let (global_s : scope) = H.create 5 in
   [global_s; built_in_s]
 
