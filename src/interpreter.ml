@@ -3,6 +3,7 @@
 open Printf
 open Py_val
 module D = DynArray
+module F = Float
 module H = Hashtbl
 module S = Stack
 
@@ -158,35 +159,43 @@ let run (c : Bytecode.code) (envr : env) =
        | BINARY_FP_DIV ->
            let tos = S.pop stack in
            let tos1 = S.pop stack in
-           (try s_push (Float ((as_float tos1) /. (as_float tos)))
-            with Type_error -> raise (Runtime_error "Type mismatch: BINARY_FP_DIV"))
+           (match F.classify_float @@ as_float tos with
+              FP_zero -> raise (Runtime_error "Division by zero: BINARY_FP_DIV")
+            | _       ->
+              (try s_push (Float ((as_float tos1) /. (as_float tos)))
+               with Type_error -> raise (Runtime_error "Type mismatch: BINARY_FP_DIV")))
        | BINARY_INT_DIV ->
            let tos = S.pop stack in
            let tos1 = S.pop stack in
-           (try if is_float tos1 || is_float tos then
-                  s_push (Float (floor ((as_float tos1) /. (as_float tos))))
-                else
-                  s_push (Int (int_of_float (floor ((as_float tos1) /. (as_float tos)))))
-            with Type_error -> raise (Runtime_error "Type mismatch: BINARY_INT_DIV"))
+           (match F.classify_float @@ as_float tos with
+              FP_zero -> raise (Runtime_error "Division by zero: BINARY_INT_DIV")
+            | _       ->
+              (try if is_float tos1 || is_float tos then
+                     s_push (Float (floor ((as_float tos1) /. (as_float tos))))
+                   else
+                     s_push (Int (int_of_float (floor ((as_float tos1) /. (as_float tos)))))
+               with Type_error -> raise (Runtime_error "Type mismatch: BINARY_INT_DIV")))
        | BINARY_MOD ->
            let tos = S.pop stack in
            let tos1 = S.pop stack in
-           (try if is_float tos1 || is_float tos then
-                  (* OPythn modulo differs from in OCaml *)
-                  let quot = (floor ((as_float tos1) /. (as_float tos))) in
-                  let ans = (as_float tos1) -. quot *. (as_float tos) in
-                  s_push (Float ans)
-                else
-                  let quot = int_of_float (floor ((as_float tos1) /. (as_float tos))) in
-                  let ans = (as_int tos1) - quot * (as_int tos) in
-                  s_push (Int ans)
-            with Type_error -> raise (Runtime_error "Type mismatch: BINARY_MOD"))
+           (match F.classify_float @@ as_float tos with
+              FP_zero -> raise (Runtime_error "Division by zero: BINARY_MOD")
+            | _       ->
+              (try if is_float tos1 || is_float tos then
+                     (* OPythn modulo differs from in OCaml *)
+                     let quot = (floor ((as_float tos1) /. (as_float tos))) in
+                     let ans = (as_float tos1) -. quot *. (as_float tos) in
+                     s_push (Float ans)
+                   else
+                     let quot = int_of_float (floor ((as_float tos1) /. (as_float tos))) in
+                     let ans = (as_int tos1) - quot * (as_int tos) in
+                     s_push (Int ans)
+               with Type_error -> raise (Runtime_error "Type mismatch: BINARY_MOD")))
        | BINARY_EXP ->
            let tos = S.pop stack in
            let tos1 = S.pop stack in
            (try if is_float tos1 || is_float tos then
                   let ans = ((as_float tos1) ** (as_float tos)) in
-                  let module F = Float in
                   match F.classify_float ans with
                     F.FP_nan -> raise (Runtime_error "Got a NaN: BINARY_EXP")
                   | _        -> s_push (Float ans)

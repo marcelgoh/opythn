@@ -48,19 +48,24 @@ let quit _ =
 
 (* read-eval-print loop *)
 let rec repl envr =
-  printf "]=> ";
-  flush stdout;
-  let buffer = Lexing.from_channel stdin in
-  Lexer.setup_repl_input buffer;
-  let tree = parse buffer in
-  printf "************ PARSER OUTPUT ************\n";
-  printf "%s\n" (Ast.show tree);
-  printf "************ BYTECODE ************\n";
-  let instrs = Bytecode.compile_prog tree in
-  Bytecode.print_asm instrs;
-  printf "************ CONSOLE OUTPUT ************\n";
-  Interpreter.interpret instrs envr;
-  repl envr
+  try
+    printf "]=> ";
+    flush stdout;
+    let buffer = Lexing.from_channel stdin in
+    Lexer.setup_repl_input buffer;
+    let tree = parse buffer in
+    printf "************ PARSER OUTPUT ************\n";
+    printf "%s\n" (Ast.show tree);
+    printf "************ BYTECODE ************\n";
+    let instrs = Bytecode.compile_prog tree in
+    Bytecode.print_asm instrs;
+    printf "************ CONSOLE OUTPUT ************\n";
+    Interpreter.interpret instrs envr;
+    repl envr
+  with e ->
+    let msg = Printexc.to_string e in
+    printf "Error: %s\n" msg;
+    repl envr
 
 let rec debug () =
   printf "DEBUG]=> ";
@@ -78,7 +83,7 @@ let main () =
     (* start interactive mode *)
     printf "+----------------------------------------------+\n";
     printf "|             OPYTHN INTERACTIVE MODE          |\n";
-    printf "|   Author: Marcel Goh (Release: 21.04.2019)   |\n";
+    printf "|   Author: Marcel Goh (Release: 24.04.2019)   |\n";
     printf "|            Type \"Ctrl-C\" to quit.            |\n";
     printf "+----------------------------------------------+\n";
     flush stdout;
