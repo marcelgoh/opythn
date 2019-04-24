@@ -176,7 +176,7 @@ let run (c : Bytecode.code) (envr : env) =
                   let quot = (floor ((as_float tos1) /. (as_float tos))) in
                   let ans = (as_float tos1) -. quot *. (as_float tos) in
                   s_push (Float ans)
-                else let r = (as_int tos1) mod (as_int tos) in
+                else
                   let quot = int_of_float (floor ((as_float tos1) /. (as_float tos))) in
                   let ans = (as_int tos1) - quot * (as_int tos) in
                   s_push (Int ans)
@@ -185,7 +185,11 @@ let run (c : Bytecode.code) (envr : env) =
            let tos = S.pop stack in
            let tos1 = S.pop stack in
            (try if is_float tos1 || is_float tos then
-                  s_push (Float ((as_float tos1) ** (as_float tos)))
+                  let ans = ((as_float tos1) ** (as_float tos)) in
+                  let module F = Float in
+                  match F.classify_float ans with
+                    F.FP_nan -> raise (Runtime_error "Got a NaN: BINARY_EXP")
+                  | _        -> s_push (Float ans)
                 else
                   if as_int tos < 0 then
                     if as_int tos1 < 0 then

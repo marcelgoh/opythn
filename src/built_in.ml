@@ -20,7 +20,7 @@ let print args =
       (match pv with
          Int i   -> printf "%d" i
        | Float f -> let str = sprintf "%f" f in
-                    printf "%s" (Str.global_replace (Str.regexp "0*$") "" str)
+           printf "%s" (Str.global_replace (Str.regexp "\([^.]\)0*$") "\1" str)
        | Bool b  -> if b then printf "True" else printf "False"
        | Str s   -> printf "%s" s
        | Fun f   -> printf "<function>"

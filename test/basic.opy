@@ -13,12 +13,17 @@ print(1 + 3 * x // y)   # 2
 
 ## BITWISE OPS ##
 print(56 << 4 & (-23 | 89) >> 8 ^ 32)
+print(x ^ y >> 3 - z + 55 & 16)
 
 ## FLOATS ##
 x = 4.999
 print(round(x % 2.3, 6), round(x % -2.3, 6))
+print(round(x // 2.3, 6), round(x // -2.3, 6))
+print(round(x / 2.3, 6), round(x / -2.3, 6))
 y = -2.39
 print(round(y % -1.9, 6), round(y % -1.9, 6))
+print(round(y // -1.9, 6), round(y // -1.9, 6))
+print(round(y / -1.9, 6), round(y / -1.9, 6))
 
 ## CONTROL STRUCTURES ##
 i = 0
