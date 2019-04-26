@@ -21,7 +21,9 @@ let print args =
       else ();
       (match pv with
          Int i   -> printf "%d" i
-       | Float f -> let str = sprintf "%f" f in
+       | Float f -> let raw = sprintf "%.15g" f in
+                    let str = if String.contains raw '.' then raw
+                              else raw ^ ".0" in
            printf "%s" (Str.global_replace (Str.regexp "\\([^.]\\)0*$") "\\1" str)
        | Bool b  -> if b then printf "True" else printf "False"
        | Str s   -> printf "%s" s
@@ -57,6 +59,19 @@ let int_cast args =
     | Fun _ | None ->
         raise (Built_in_error "Failed typecast: INT_CAST()")
 
+(* float() *)
+let float_cast args =
+  if List.length args <> 1 then
+    raise (Built_in_error "Exactly one argument expected: FLOAT_CAST()")
+  else
+    match List.hd args with
+      Int i   -> Float (float_of_int i)
+    | Float f -> Float f
+    | Str s   -> Float (float_of_string s)
+    | Bool b  -> if b then Float 1.0 else Float 0.0
+    | Fun _ | None ->
+        raise (Built_in_error "Failed typecast: FLOAT_CAST()")
+
 (* round() *)
 let round args =
   if List.length args <> 2 then
@@ -87,6 +102,7 @@ let table : (string, Py_val.t) Hashtbl.t =
   H.add s "print" (Fun print_ln);
   H.add s "input" (Fun input);
   H.add s "int" (Fun int_cast);
+  H.add s "float" (Fun float_cast);
   H.add s "round" (Fun round);
   s
 

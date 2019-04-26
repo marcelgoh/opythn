@@ -85,9 +85,11 @@ let rec compile_expr (arr : code) (e : Ast.expr) : unit =
 let rec compile_stmt (arr : code) (in_loop : bool) (s : Ast.stmt) : unit =
   (match s with
      Expr e         -> compile_expr arr e;
+(*
                        (match e with
                           Call _ -> D.add arr POP_TOP (* throw away result of call *)
                         | _      -> ())
+*)
    | Assign (s, e)  -> compile_expr arr e;
                        D.add arr (STORE_NAME s);
    | If (c, s1, s2) -> compile_expr arr c;
@@ -127,8 +129,13 @@ let rec compile_stmt (arr : code) (in_loop : bool) (s : Ast.stmt) : unit =
                        else
                          D.add arr (JUMP (-20))) (* -20 indicates continue *)
 
+(* ensures that global and nonlocal declarations are valid *)
+let check_scopes (p : Ast.program) : unit =
+  ()
+
 (* compile_prog p : Ast.program -> D.t *)
 let compile_prog (p : Ast.program) : code =
+  check_scopes p;
   let rec iter arr stmts =
     match stmts with
       []    -> ()

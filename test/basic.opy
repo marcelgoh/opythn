@@ -17,13 +17,13 @@ print(x ^ y >> 3 - z + 55 & 16)
 
 ## FLOATS ##
 x = 4.999
-print(round(x % 2.3, 6), round(x % -2.3, 6))
-print(round(x // 2.3, 6), round(x // -2.3, 6))
+print(round(x % 2.3, 10), round(x % -2.3, 10))
+print(round(x // 2.3, 7), round(x // -2.3, 7))
 print(round(x / 2.3, 6), round(x / -2.3, 6))
 y = -2.39
 print(round(y % -1.9, 6), round(y % -1.9, 6))
 print(round(y // -1.9, 6), round(y // -1.9, 6))
-print(round(y / -1.9, 6), round(y / -1.9, 6))
+print(round(y / -1.9, 7), round(y / -1.9, 7))
 
 ## CONTROL STRUCTURES ##
 i = 0

@@ -324,8 +324,14 @@ let run (c : Bytecode.code) (envr : env) =
 let interpret c envr =
   let s = run c envr in
   if not @@ S.is_empty s then
-    let (Fun f) = lookup_global envr "print" in
-    f [S.pop s] |> ignore
+    match S.top s with
+      None -> ()
+    | _ ->
+      (* try to print top of stack *)
+      let pv = lookup_global envr "print" in
+      (match pv with
+         Fun f -> f [S.pop s] |> ignore
+       | _     -> ())
   else ()
 
 (* create a new environment and fill it with built-ins *)

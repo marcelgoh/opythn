@@ -1,10 +1,10 @@
 #!/bin/bash
 
-set -e  # abort if any command fails
+# set -e  # abort if any command fails
 
 echo "Running make..."
 cd ..
-make > /dev/null
+make > /dev/null || exit 1
 cd test
 echo "Compiled OK."
 
