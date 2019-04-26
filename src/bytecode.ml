@@ -1,4 +1,4 @@
-(* Bytecode representation andcompilation *)
+(* Bytecode representation and compilation *)
 
 open Printf
 module D = DynArray

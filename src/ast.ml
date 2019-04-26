@@ -28,9 +28,9 @@ type stmt =
 | If of expr * stmt list * ((stmt list) option)
 | While of expr * stmt list
 | Funcdef of string * string list * stmt list
-| Global of string
+| Global of string     (* one declaration at a time *)
 | Nonlocal of string
-| Return of expr
+| Return of expr       (* return only one expression *)
 | Break
 | Continue
 [@@deriving show]

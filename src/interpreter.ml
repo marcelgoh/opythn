@@ -11,7 +11,10 @@ exception Runtime_error of string
 exception Type_error
 
 type scope = (string, Py_val.t) H.t
-type env = scope list
+type env = {
+  local : scope list;
+  global : scope list;
+}
 
 (* type conversion functions *)
 let as_bool = function
@@ -95,14 +98,16 @@ let py_in pv1 pv2 =
       raise Type_error (* not iterable *)
 
 (* environment functions *)
-let rec lookup envr id =
-  match envr with
+let rec lookup_scope_list s_list id =
+  match s_list with
     [] ->
       raise (Runtime_error (Printf.sprintf "Variable \"%s\" not found: LOAD_NAME" id))
-  | e::es ->
-      (match H.find_opt e id with
+  | s::ss ->
+      (match H.find_opt s id with
          Some pv -> pv
-       | None -> lookup es id)
+       | None -> lookup_scope_list ss id)
+
+let lookup_global envr id = lookup_scope_list envr.global id
 
 (* run code on virtual stack machine *)
 let run (c : Bytecode.code) (envr : env) =
@@ -289,10 +294,10 @@ let run (c : Bytecode.code) (envr : env) =
        | RETURN_VALUE -> () (* TODO *)
        | STORE_NAME id ->
            let tos = S.pop stack in
-           let scp = List.hd envr in
+           let scp = List.hd envr.global in
            H.replace scp id tos
        | LOAD_CONST pv -> s_push pv
-       | LOAD_NAME id -> s_push @@ lookup envr id
+       | LOAD_NAME id -> s_push @@ lookup_global envr id
        | JUMP t -> next := t
        | POP_JUMP_IF_FALSE t -> if as_bool (S.pop stack) then () else next := t
        | JUMP_IF_TRUE_OR_POP t ->
@@ -319,17 +324,16 @@ let run (c : Bytecode.code) (envr : env) =
 let interpret c envr =
   let s = run c envr in
   if not @@ S.is_empty s then
-    Built_in.print_ln [S.pop s] |> ignore
+    let (Fun f) = lookup_global envr "print" in
+    f [S.pop s] |> ignore
   else ()
 
 (* create a new environment and fill it with built-ins *)
-let init_env () =
+let init_env () : env =
   (* initialise scopes -- two for now *)
-  let (built_in_s : scope) = H.create 5 in
-  H.add built_in_s "print" (Fun Built_in.print_ln);
-  H.add built_in_s "input" (Fun Built_in.input);
-  H.add built_in_s "int" (Fun Built_in.int_cast);
-  H.add built_in_s "round" (Fun Built_in.round);
+  let (built_in_s : scope) = Built_in.table in
   let (global_s : scope) = H.create 5 in
-  [global_s; built_in_s]
+  { local = [];
+    global = [global_s; built_in_s];
+  }
 

@@ -3,6 +3,8 @@
 open Printf
 open Py_val
 
+module H = Hashtbl
+
 exception Built_in_error of string
 
 (* all of these functions are of type
@@ -20,7 +22,7 @@ let print args =
       (match pv with
          Int i   -> printf "%d" i
        | Float f -> let str = sprintf "%f" f in
-           printf "%s" (Str.global_replace (Str.regexp "\([^.]\)0*$") "\1" str)
+           printf "%s" (Str.global_replace (Str.regexp "\\([^.]\\)0*$") "\\1" str)
        | Bool b  -> if b then printf "True" else printf "False"
        | Str s   -> printf "%s" s
        | Fun f   -> printf "<function>"
@@ -78,3 +80,13 @@ let round args =
   let round' x = floor (x +. 0.5) in
   let factor = 10.0 ** (float_of_int d) in
   Float ((round' (n *. factor)) /. (factor))
+
+(* built-in scope *)
+let table : (string, Py_val.t) Hashtbl.t =
+  let s = H.create 5 in
+  H.add s "print" (Fun print_ln);
+  H.add s "input" (Fun input);
+  H.add s "int" (Fun int_cast);
+  H.add s "round" (Fun round);
+  s
+

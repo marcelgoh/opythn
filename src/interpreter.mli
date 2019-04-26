@@ -1,7 +1,10 @@
 (* interface for bytecode interpreter *)
 
 type scope = (string, Py_val.t) Hashtbl.t
-type env = scope list
+type env = {
+  local : scope list;
+  global : scope list;
+}
 
 exception Runtime_error of string
 
