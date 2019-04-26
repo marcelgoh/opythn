@@ -27,6 +27,10 @@ type stmt =
 | Assign of string * expr
 | If of expr * stmt list * ((stmt list) option)
 | While of expr * stmt list
+| Funcdef of string * string list * stmt list
+| Global of string
+| Nonlocal of string
+| Return of expr
 | Break
 | Continue
 [@@deriving show]

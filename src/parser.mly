@@ -22,6 +22,7 @@
 %token TRUE    %token FALSE  %token NONE
 %token IF      %token ELIF   %token ELSE
 %token WHILE   %token BREAK  %token CONTINUE
+%token DEF     %token GLOBAL %token NONLOCAL %token RETURN
 (* word-like operators *)
 %token AND %token OR %token NOT %token IS %token IN %token NOT_IN %token IS_NOT
 (* symbolic operators *)
@@ -31,8 +32,8 @@
 %token GEQ     %token BW_AND %token BW_OR %token BW_COMP
 %token BW_XOR  %token LSHIFT %token RSHIFT
 (* delimiters *)
-%token LPAREN   %token RPAREN   %token LSQUARE  %token RSQUARE
-%token LCURLY   %token RCURLY   %token DOT      %token COMMA
+%token LPAREN   %token RPAREN(* %token LSQUARE  %token RSQUARE
+%token LCURLY   %token RCURLY   %token DOT  *)  %token COMMA
 %token COLON    %token SEMIC    %token ASSIG    %token PLUS_A
 %token MINUS_A  %token TIMES_A  %token FP_DIV_A %token INT_DIV_A
 %token MOD_A    %token EXP_A    %token BW_AND_A %token BW_OR_A
@@ -53,7 +54,7 @@
 %left PLUS MINUS
 %left TIMES FP_DIV INT_DIV MOD
 %right EXP
-%right LSQUARE LPAREN DOT RPAREN
+(* %right LSQUARE LPAREN DOT RPAREN *)
 
 (* type declarations *)
 %start <Ast.program> input
@@ -82,6 +83,11 @@
 %type <Ast.expr> atom
 %type <Ast.expr> call
 %type <Ast.expr list> argument_list
+%type <string list> param_id_list
+%type <Ast.stmt> funcdef
+%type <Ast.stmt> return_stmt
+%type <Ast.stmt> global_stmt
+%type <Ast.stmt> nonlocal_stmt
 
 %% (* list of production rules *)
 
@@ -109,14 +115,18 @@ small_stmts:
 small_stmt:
   s = expr_stmt { s }
 | s = flow_stmt { s }
+| s = global_stmt { s }
+| s = nonlocal_stmt { s }
 flow_stmt:
   BREAK { Break }
 | CONTINUE { Continue }
+| s = return_stmt { s }
 
 (* compound statements *)
 compound_stmt:
   s = if_stmt { s }
 | s = while_stmt { s }
+| s = funcdef { s }
 condition:
   t = expr { t }
 | c = cond_expr { c }
@@ -217,3 +227,17 @@ call:
 argument_list:
   e = expr { [e] }
 | e = expr; COMMA; rest = argument_list { e :: rest }
+(* function declarations and statements *)
+param_id_list:
+  i = ID { [i] }
+| i = ID; COMMA; rest = param_id_list { i :: rest }
+funcdef:
+  DEF; name = ID; LPAREN; args = param_id_list; RPAREN; COLON; body = suite {
+    Funcdef(name, args, body)
+  }
+return_stmt:
+  RETURN; e = expr { Return e }
+global_stmt:
+  GLOBAL; i = ID { Global i }
+nonlocal_stmt:
+  NONLOCAL; i = ID { Nonlocal i }

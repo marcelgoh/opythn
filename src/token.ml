@@ -4,9 +4,10 @@ type token =
   ID of string | INT of int | FLOAT of float | STR of string
 | NEWLINE | INDENT | DEDENT | EOF
 (* keywords *)
-| TRUE  | FALSE | NONE
-| IF    | ELIF  | ELSE
-| WHILE | BREAK | CONTINUE
+| TRUE  | FALSE  | NONE
+| IF    | ELIF   | ELSE
+| WHILE | BREAK  | CONTINUE
+| DEF   | GLOBAL | NONLOCAL | RETURN
 (* word-like operators *)
 | AND | OR | NOT | IS | IN | NOT_IN | IS_NOT
 (* symbolic operators *)

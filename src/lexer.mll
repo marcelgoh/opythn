@@ -31,7 +31,8 @@
                 "and", AND;     "or", OR;       "not", NOT;
                 "is", IS;       "in", IN;
                 "if", IF;       "elif", ELIF;   "else", ELSE;
-                "while", WHILE; "break", BREAK; "continue", CONTINUE ]
+                "while", WHILE; "break", BREAK; "continue", CONTINUE;
+                "def", DEF; "global", GLOBAL; "nonlocal", NONLOCAL; "return", RETURN ]
 
   (* returns number of spaces, where a tab counts as 4 spaces *)
   let count_ws (str : string) : int =
