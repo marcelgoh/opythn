@@ -7,7 +7,7 @@ type token =
 | TRUE  | FALSE  | NONE
 | IF    | ELIF   | ELSE
 | WHILE | BREAK  | CONTINUE
-| DEF   | GLOBAL | NONLOCAL | RETURN
+| DEF   | GLOBAL | NONLOCAL | RETURN | LAMBDA
 (* word-like operators *)
 | AND | OR | NOT | IS | IN | NOT_IN | IS_NOT
 (* symbolic operators *)

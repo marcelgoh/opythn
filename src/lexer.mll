@@ -27,12 +27,13 @@
   let _ =
     List.iter (fun (kword, tok) ->
                  Hashtbl.add keyword_table kword tok)
-              [ "True", TRUE;   "False", FALSE; "None", NONE;
-                "and", AND;     "or", OR;       "not", NOT;
-                "is", IS;       "in", IN;
-                "if", IF;       "elif", ELIF;   "else", ELSE;
-                "while", WHILE; "break", BREAK; "continue", CONTINUE;
-                "def", DEF; "global", GLOBAL; "nonlocal", NONLOCAL; "return", RETURN ]
+              [ "True", TRUE;     "False", FALSE;   "None", NONE;
+                "and", AND;       "or", OR;         "not", NOT;
+                "is", IS;         "in", IN;
+                "if", IF;         "elif", ELIF;     "else", ELSE;
+                "while", WHILE;   "break", BREAK;   "continue", CONTINUE;
+                "def", DEF;       "global", GLOBAL; "nonlocal", NONLOCAL;
+                "return", RETURN; "lambda", LAMBDA]
 
   (* returns number of spaces, where a tab counts as 4 spaces *)
   let count_ws (str : string) : int =

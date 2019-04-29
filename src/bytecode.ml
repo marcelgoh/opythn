@@ -9,6 +9,15 @@ exception Bytecode_error of string
 (* alias for a DynArray of Instr.t *)
 type code = Instr.t DynArray.t
 
+(* representation for how deeply nested a variable can be *)
+type depth =
+  Local of int
+| Global
+| Referred
+
+(* table of names and depths for a given scope *)
+type local_table = (string, depth) H.t
+
 (* prints a list of instructions in readable format *)
 let print_asm instrs =
   for i = 0 to D.length instrs - 1 do
@@ -129,22 +138,76 @@ let rec compile_stmt (arr : code) (in_loop : bool) (s : Ast.stmt) : unit =
                        else
                          D.add arr (JUMP (-20))) (* -20 indicates continue *)
 
-(* ensures that global and nonlocal declarations are valid *)
-let check_scopes (p : Ast.program) : unit =
-  ()
-
-(* compile_prog p : Ast.program -> D.t *)
-let compile_prog (p : Ast.program) : code =
-  check_scopes p;
-  let rec iter arr stmts =
+(* recursively compile statements *)
+let rec compile_stmts stmts sym_scope =
+  let is_global = match sym_scope with [] -> true | _ -> false in
+  let table : local_table = H.create 10 in
+  (* check enclosing scopes for name, return number of levels up *)
+  let rec search_upwards count tables str : int option =
+    match sym_scope with
+      []    -> None
+    | t::ts -> (match H.find_opt t str with
+                  Some d -> (match d with
+                               Local _ -> Some count
+                             | _       -> None)
+                | None   -> search_upwards (count + 1) ts str)
+  in
+  (* resolve a single expr and return unit *)
+  let rec resolve_expr (expr : Ast.expr) =
+    match expr with
+      Var s           -> H.replace table s Referred;
+    | Call(f ,es)     -> resolve_expr f;
+                         List.iter resolve_expr es
+    | Op(_, e)        -> List.iter resolve_expr e
+    | Cond(e1, c, e2) -> resolve_expr e1;
+                         resolve_expr c;
+                         resolve_expr e2
+    | IntLit _ | FloatLit _ | BoolLit _ | StrLit _ | Lambda(_,_) | None -> ()
+  in
+  (* iterate through statements and resolve each one *)
+  let rec resolve_iter (stmts : Ast.stmt list) =
+    match stmts with
+      []    -> ()
+    | s::ss -> (match s with
+                  Expr e        -> resolve_expr e;
+                | Assign(s, e)  -> H.replace table s (Local 0);
+                                   resolve_expr e
+                | If(c, s1, s2) -> resolve_expr c;
+                                   resolve_iter s1;
+                                   (match s2 with
+                                      Some ss -> resolve_iter ss
+                                    | None -> ())
+                | While(c, s)   -> resolve_expr c;
+                                   resolve_iter s
+                | Global s      -> (match H.find_opt table s with
+                                      None   -> H.add table s Global
+                                    | Some _ ->
+                                        if is_global then ()
+                                        else raise (Bytecode_error
+                                                      (sprintf "Name \"%s\" used before global declaration" s)))
+                | Nonlocal s    -> if is_global then
+                                     raise (Bytecode_error "Nonlocal declared in global scope")
+                                   else (match search_upwards 1 sym_scope s with
+                                           Some num -> H.add table s (Local num)
+                                         | None -> raise (Bytecode_error
+                                                            (sprintf "No binding for %s found" s)))
+                | Return e      -> resolve_expr e
+                | Funcdef(_,_,_) | Break | Continue -> ());
+               resolve_iter ss
+  in
+  (* iterate compile statements *)
+  let rec compile_iter arr stmts =
     match stmts with
       []    -> ()
     | s::ss -> compile_stmt arr false s;
-               iter arr ss in
+               compile_iter arr ss in
   let instrs = D.create () in
-  iter instrs p;
+  compile_iter instrs stmts;
 (*
   D.add instrs (LOAD_CONST None);
   D.add instrs RETURN_VALUE;
 *)
   instrs
+
+(* interface to the rest of the system *)
+let compile_prog (p : Ast.program) : code = compile_stmts p []

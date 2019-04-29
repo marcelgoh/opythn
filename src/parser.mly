@@ -22,7 +22,7 @@
 %token TRUE    %token FALSE  %token NONE
 %token IF      %token ELIF   %token ELSE
 %token WHILE   %token BREAK  %token CONTINUE
-%token DEF     %token GLOBAL %token NONLOCAL %token RETURN
+%token DEF     %token GLOBAL %token NONLOCAL %token RETURN %token LAMBDA
 (* word-like operators *)
 %token AND %token OR %token NOT %token IS %token IN %token NOT_IN %token IS_NOT
 (* symbolic operators *)
@@ -42,6 +42,7 @@
 %token START_FILE %token START_REPL
 
 (* associativity and precedence *)
+%nonassoc LAMBDA
 %left OR
 %left AND
 %nonassoc NOT
@@ -194,6 +195,10 @@ expr:
 | e1 = expr; op = comp_op; e2 = expr { Op(op, [e1; e2]) } %prec EQ
 (* parenthesised expressions *)
 | LPAREN; e = expr; RPAREN { e }
+(* lambda expression *)
+| LAMBDA; args = param_id_list; COLON; body = expr {
+    Lambda(args, body)
+  } %prec LAMBDA
 aug_assign:
   v = ID; BW_OR_A; e = expr { Assign(v, Op(BwOr, [Var v; e])) }
 | v = ID; BW_XOR_A; e = expr { Assign(v, Op(BwXor, [Var v; e])) }
@@ -232,8 +237,10 @@ param_id_list:
   i = ID { [i] }
 | i = ID; COMMA; rest = param_id_list { i :: rest }
 funcdef:
-  DEF; name = ID; LPAREN; args = param_id_list; RPAREN; COLON; body = suite {
-    Funcdef(name, args, body)
+  DEF; name = ID; LPAREN; args = param_id_list?; RPAREN; COLON; body = suite {
+    match args with
+      Some a -> Funcdef(name, a, body)
+    | None   -> Funcdef(name, [], body)
   }
 return_stmt:
   RETURN; e = expr { Return e }

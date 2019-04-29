@@ -19,6 +19,7 @@ type expr =
 (* operators are treated the same regardless of arity *)
 | Op of op * expr list
 | Cond of expr * expr * expr (* ternary expression *)
+| Lambda of string list * expr    (* anonymous function *)
 | None
 [@@deriving show]
 
