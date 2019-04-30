@@ -16,24 +16,29 @@ type depth =
 | Referred
 
 (* table of names and depths for a given scope *)
-type local_table = (string, depth) H.t
+type sym_table = (string, depth) H.t
 
-(* prints a list of instructions in readable format *)
-let print_asm instrs =
-  for i = 0 to D.length instrs - 1 do
-    printf "%d\t%s\n" i (Instr.str_of_instr (D.get instrs i))
-  done
+(* print a string and its depth *)
+(* usage: H.iter print_entry (table : sym_table) *)
+let print_entry str depth =
+  let dstr =
+    match depth with
+      Local i -> sprintf "Local %d" i
+    | Global -> "Global" | Referred -> "Referred"
+  in
+  printf "%s: %s\n" str dstr
 
+(* print bytecode *)
+let print_asm = Instr.print_instr_array
 
 (* recursively compile statements *)
-let rec compile_stmts stmts sym_scope =
+let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
 
-  let is_global = match sym_scope with [] -> true | _ -> false in
-  let table : local_table = H.create 10 in
+  let is_global = match enclosings with [] -> true | _ -> false in
 
   (* check enclosing scopes for name, return number of levels up *)
   let rec search_upwards count tables str : int option =
-    match sym_scope with
+    match tables with
       []    -> None
     | t::ts -> (match H.find_opt t str with
                   Some d -> (match d with
@@ -45,7 +50,9 @@ let rec compile_stmts stmts sym_scope =
   (* resolve a single expr and return unit *)
   let rec resolve_expr (expr : Ast.expr) =
     match expr with
-      Var s           -> H.replace table s Referred;
+      Var s           -> (match H.find_opt table s with
+                            Some _ -> ()
+                          | None -> H.replace table s Referred)
     | Call(f ,es)     -> resolve_expr f;
                          List.iter resolve_expr es
     | Op(_, e)        -> List.iter resolve_expr e
@@ -57,37 +64,59 @@ let rec compile_stmts stmts sym_scope =
 
   (* iterate through statements and resolve each one *)
   let rec resolve_stmts (stmts : Ast.stmt list) =
+    let add_name name =
+      if is_global then
+        H.replace table name Global
+      else
+        H.replace table name (Local 0)
+    in
     match stmts with
       []    -> ()
     | s::ss -> (match s with
-                  Expr e        -> resolve_expr e;
-                | Assign(s, e)  -> H.replace table s (Local 0);
-                                   resolve_expr e
-                | If(c, s1, s2) -> resolve_expr c;
-                                   resolve_stmts s1;
-                                   (match s2 with
-                                      Some ss -> resolve_stmts ss
-                                    | None -> ())
-                | While(c, s)   -> resolve_expr c;
-                                   resolve_stmts s
-                | Global s      -> (match H.find_opt table s with
-                                      None   -> H.add table s Global
-                                    | Some _ ->
-                                        if is_global then ()
-                                        else raise (Bytecode_error
-                                                      (sprintf "Name \"%s\" used before global declaration" s)))
-                | Nonlocal s    -> if is_global then
-                                     raise (Bytecode_error "Nonlocal declared in global scope")
-                                   else (match search_upwards 1 sym_scope s with
-                                           Some num -> H.add table s (Local num)
-                                         | None -> raise (Bytecode_error
-                                                            (sprintf "No binding for %s found" s)))
+                  Expr e -> resolve_expr e;
+                | Assign(s, e) ->
+                    add_name s;
+                    resolve_expr e
+                | If(c, s1, s2) ->
+                    resolve_expr c;
+                    resolve_stmts s1;
+                    (match s2 with
+                       Some ss -> resolve_stmts ss
+                     | None -> ())
+                | While(c, s) ->
+                    resolve_expr c;
+                    resolve_stmts s
+                | Global s ->
+                    (match H.find_opt table s with
+                       None   -> H.add table s Global
+                     | Some _ ->
+                         if is_global then ()
+                         else
+                           raise
+                           (Bytecode_error (sprintf "Name `%s` used before global declaration" s)))
+                | Nonlocal s ->
+                    if is_global then
+                      raise (Bytecode_error "Nonlocal declared in global scope")
+                    else
+                      (match H.find_opt table s with
+                         Some _ ->
+                           raise
+                             (Bytecode_error (sprintf "Name `%s` used before nonlocal declaration" s))
+                       | None ->
+                           (match search_upwards 1 enclosings s with
+                              Some num -> H.add table s (Local num)
+                            | None ->
+                                raise (Bytecode_error (sprintf "No binding for %s found" s))))
                 | Return e      -> resolve_expr e
-                | Funcdef(_,_,_) | Break | Continue -> ());
+                (* we don't resolve inside function declarations *)
+                | Funcdef(name, _, _) ->
+                    add_name name
+                | Break | Continue -> ());
                resolve_stmts ss
   in
 
-  let instrs : Instr.t D.t = D.create () in  (* the two functions below modify this instruction array *)
+  (* the two functions below modify this instruction array *)
+  let instrs : Instr.t D.t = D.create () in
 
   (* convert an expression to bytecode and add instructions to array *)
   let rec compile_expr (e : Ast.expr) : unit =
@@ -165,53 +194,70 @@ let rec compile_stmts stmts sym_scope =
 
   (* convert a statement to bytecode and append instructions to instruction array *)
   let rec compile_stmt (in_loop : bool) (s : Ast.stmt) : unit =
+    let compile_id id =
+      let instr : Instr.t =
+        (match H.find_opt table id with
+           Some (Local n) -> (STORE_LOCAL(n, id))
+         | Some Global
+         | Some Referred  -> (STORE_GLOBAL id)
+         | None -> (STORE_NAME id)) (* this should not happen *)
+      in
+      D.add instrs instr
+    in
     (match s with
-       Expr e         -> compile_expr e;
-     | Assign (s, e)  -> compile_expr e;
-                         let instr : Instr.t =
-                           (match H.find_opt table s with
-                              Some (Local i) -> (STORE_LOCAL(i, s))
-                            | Some Global
-                            | Some Referred  -> (STORE_GLOBAL s)
-                            | None -> (STORE_NAME s)) (* this should not happen *)
-                         in
-                         D.add instrs instr
-     | If (c, s1, s2) -> compile_expr c;
-                         let pop_index = D.length instrs in
-                         D.add instrs (POP_JUMP_IF_FALSE (-1)); (* dummy 1 *)
-                         List.iter (compile_stmt in_loop) s1;
-                         (match s2 with
-                            Some ss ->
-                              let jump_index = D.length instrs in
-                              D.add instrs (JUMP (-1)); (* dummy 2 *)
-                              D.set instrs pop_index (POP_JUMP_IF_FALSE (D.length instrs)); (* backfill 1 *)
-                              List.iter (compile_stmt in_loop) ss;
-                              D.set instrs jump_index (JUMP (D.length instrs)); (* backfill 2 *)
-                          | None ->
-                              D.set instrs pop_index (POP_JUMP_IF_FALSE (D.length instrs))); (* just backfill 1 *)
-     | While (c, ss)  -> let start_idx = D.length instrs in
-                         compile_expr c;
-                         let pop_index = D.length instrs in
-                         D.add instrs (POP_JUMP_IF_FALSE (-1)); (* dummy *)
-                         List.iter (compile_stmt true) ss;
-                         D.add instrs (JUMP start_idx); (* goto beginning of loop *)
-                         let end_idx = D.length instrs in
-                         D.set instrs pop_index (POP_JUMP_IF_FALSE end_idx); (* backfill *)
-                         (* scan over tokens that were added to backfill breaks and continues *)
-                         for i = start_idx to end_idx - 1 do
-                           match D.get instrs i with
-                             JUMP t -> if t = -10 then D.set instrs i (JUMP end_idx) else
-                                       if t = -20 then D.set instrs i (JUMP start_idx) else ()
-                           | _      -> ()
-                         done
-     | Break          -> if not in_loop then
-                           raise (Bytecode_error "BREAK statement found outside loop.")
-                         else
-                           D.add instrs (JUMP (-10)) (* -10 indicates break *)
-     | Continue       -> if not in_loop then
-                           raise (Bytecode_error "CONTINUE statement found outside loop.")
-                         else
-                           D.add instrs (JUMP (-20))) (* -20 indicates continue *)
+       Expr e -> compile_expr e;
+     | Assign (id, e) -> compile_expr e; compile_id id
+     | If (c, s1, s2) ->
+         compile_expr c;
+         let pop_index = D.length instrs in
+         D.add instrs (POP_JUMP_IF_FALSE (-1)); (* dummy 1 *)
+         List.iter (compile_stmt in_loop) s1;
+         (match s2 with
+            Some ss ->
+              let jump_index = D.length instrs in
+              D.add instrs (JUMP (-1)); (* dummy 2 *)
+              D.set instrs pop_index (POP_JUMP_IF_FALSE (D.length instrs)); (* backfill 1 *)
+              List.iter (compile_stmt in_loop) ss;
+              D.set instrs jump_index (JUMP (D.length instrs)); (* backfill 2 *)
+          | None ->
+              D.set instrs pop_index (POP_JUMP_IF_FALSE (D.length instrs))); (* just backfill 1 *)
+     | While (c, ss) ->
+         let start_idx = D.length instrs in
+         compile_expr c;
+         let pop_index = D.length instrs in
+         D.add instrs (POP_JUMP_IF_FALSE (-1)); (* dummy *)
+         List.iter (compile_stmt true) ss;
+         D.add instrs (JUMP start_idx); (* goto beginning of loop *)
+         let end_idx = D.length instrs in
+         D.set instrs pop_index (POP_JUMP_IF_FALSE end_idx); (* backfill *)
+         (* scan over tokens that were added to backfill breaks and continues *)
+         for i = start_idx to end_idx - 1 do
+           match D.get instrs i with
+             JUMP t -> if t = -10 then D.set instrs i (JUMP end_idx) else
+                       if t = -20 then D.set instrs i (JUMP start_idx) else ()
+           | _      -> ()
+         done
+     | Funcdef (name, args, body) ->
+         let new_table = H.create 10 in
+         List.iter (fun s -> H.add new_table s (Local 0)) args;
+         let code_block : code = compile_stmts body (table::enclosings) new_table in
+         D.add instrs (MAKE_FUNCTION (args, ref code_block));
+         compile_id name
+     | Return e ->
+         compile_expr e;
+         D.add instrs RETURN_VALUE
+     | Break ->
+         if not in_loop then
+           raise (Bytecode_error "BREAK statement found outside loop.")
+         else
+           D.add instrs (JUMP (-10)) (* -10 indicates break *)
+     | Continue ->
+         if not in_loop then
+           raise (Bytecode_error "CONTINUE statement found outside loop.")
+         else
+           D.add instrs (JUMP (-20)) (* -20 indicates continue *)
+     | Global _ | Nonlocal _ -> ()
+    )
   in
 
   (* iterate and compile statements *)
@@ -225,11 +271,7 @@ let rec compile_stmts stmts sym_scope =
   (* start routine *)
   resolve_stmts stmts;   (* fill the hashtable of depths *)
   compile_iter stmts;    (* compile *)
-(*
-  D.add instrs (LOAD_CONST None);
-  D.add instrs RETURN_VALUE;
-*)
   instrs
 
 (* interface to the rest of the system *)
-let compile_prog (p : Ast.program) : code = compile_stmts p []
+let compile_prog (p : Ast.program) : code = compile_stmts p [] (H.create 10)

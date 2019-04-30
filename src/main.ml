@@ -115,7 +115,7 @@ let main () =
   )
   else
     if Sys.argv.(1) = "-debug" then (
-      if argc >= 2 then
+      if argc > 2 then
         (* run file with all outputs *)
         handle_file true Sys.argv.(2)
       else (

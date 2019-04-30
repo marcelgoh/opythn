@@ -1,4 +1,4 @@
-(* interface for bytecode compiler *)
+(* Interface for bytecode compiler *)
 
 (* alias for a DynArray of Instr.t *)
 type code = Instr.t DynArray.t
