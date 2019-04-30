@@ -24,124 +24,13 @@ let print_asm instrs =
     printf "%d\t%s\n" i (Instr.str_of_instr (D.get instrs i))
   done
 
-(* convert an expression to bytecode and add instructions to array *)
-let rec compile_expr (arr : code) (e : Ast.expr) : unit =
-  match e with
-    Var id         -> D.add arr (LOAD_NAME id)
-  | IntLit i       -> D.add arr (LOAD_CONST (Int i))
-  | FloatLit f     -> D.add arr (LOAD_CONST (Float f))
-  | BoolLit b      -> D.add arr (LOAD_CONST (Bool b))
-  | StrLit s       -> D.add arr (LOAD_CONST (Str s))
-  | Call (f, args) -> compile_expr arr f;
-                      List.iter (compile_expr arr) args;
-                      D.add arr (CALL_FUNCTION (List.length args))
-  | Op (And, args) -> (match args with
-                         e1::e2::_ ->
-                           compile_expr arr e1;
-                           let pop_index = D.length arr in
-                           D.add arr (JUMP_IF_FALSE_OR_POP (-1)); (* dummy *)
-                           compile_expr arr e2;
-                           D.set arr pop_index (JUMP_IF_FALSE_OR_POP (D.length arr)) (* backfill *)
-                       | _         -> raise (Bytecode_error "Not enough arguments: AND"))
-  | Op (Or, args)  -> (match args with
-                         e1::e2::_ ->
-                           compile_expr arr e1;
-                           let pop_index = D.length arr in
-                           D.add arr (JUMP_IF_TRUE_OR_POP (-1)); (* dummy *)
-                           compile_expr arr e2;
-                           D.set arr pop_index (JUMP_IF_TRUE_OR_POP (D.length arr)) (* backfill *)
-                       | _         -> raise (Bytecode_error "Not enough arguments: OR"))
-  | Op (o, args)   -> List.iter (compile_expr arr) args;
-                      (match o with
-                       | Not    -> D.add arr UNARY_NOT
-                       | Is     -> D.add arr COMPARE_IS
-                       | In     -> D.add arr COMPARE_IN
-                       | NotIn  -> D.add arr COMPARE_IN
-                       | IsNot  -> D.add arr COMPARE_IS_NOT
-                       | Plus   -> D.add arr BINARY_ADD
-                       | Minus  -> D.add arr BINARY_SUB
-                       | Times  -> D.add arr BINARY_MULT
-                       | FpDiv  -> D.add arr BINARY_FP_DIV
-                       | IntDiv -> D.add arr BINARY_INT_DIV
-                       | Mod    -> D.add arr BINARY_MOD
-                       | Exp    -> D.add arr BINARY_EXP
-                       | Eq     -> D.add arr COMPARE_EQ
-                       | Neq    -> D.add arr COMPARE_NEQ
-                       | Lt     -> D.add arr COMPARE_LT
-                       | Gt     -> D.add arr COMPARE_GT
-                       | Leq    -> D.add arr COMPARE_LEQ
-                       | Geq    -> D.add arr COMPARE_GEQ
-                       | BwAnd  -> D.add arr BINARY_BW_AND
-                       | BwOr   -> D.add arr BINARY_BW_OR
-                       | BwComp -> D.add arr UNARY_BW_COMP
-                       | BwXor  -> D.add arr BINARY_BW_XOR
-                       | LShift -> D.add arr BINARY_LSHIFT
-                       | RShift -> D.add arr BINARY_RSHIFT
-                       | Neg    -> D.add arr UNARY_NEG
-                       | _      -> raise (Bytecode_error "Invalid operator encountered."))
-  | Cond (c,e1,e2) -> compile_expr arr c;
-                      let pop_index = D.length arr in
-                      D.add arr (POP_JUMP_IF_FALSE (-1)); (* dummy 1 *)
-                      compile_expr arr e1;
-                      let jump_index = D.length arr in
-                      D.add arr (JUMP (-1)); (* dummy 2 *)
-                      D.set arr pop_index (POP_JUMP_IF_FALSE (D.length arr)); (* backfill 1 *)
-                      compile_expr arr e2;
-                      D.set arr jump_index (JUMP (D.length arr)) (* backfill 2 *)
-  | None           -> D.add arr (LOAD_CONST None)
-
-(* convert a statement to bytecode and append instructions to array *)
-let rec compile_stmt (arr : code) (in_loop : bool) (s : Ast.stmt) : unit =
-  (match s with
-     Expr e         -> compile_expr arr e;
-(*
-                       (match e with
-                          Call _ -> D.add arr POP_TOP (* throw away result of call *)
-                        | _      -> ())
-*)
-   | Assign (s, e)  -> compile_expr arr e;
-                       D.add arr (STORE_NAME s);
-   | If (c, s1, s2) -> compile_expr arr c;
-                       let pop_index = D.length arr in
-                       D.add arr (POP_JUMP_IF_FALSE (-1)); (* dummy 1 *)
-                       List.iter (compile_stmt arr in_loop) s1;
-                       (match s2 with
-                          Some ss ->
-                            let jump_index = D.length arr in
-                            D.add arr (JUMP (-1)); (* dummy 2 *)
-                            D.set arr pop_index (POP_JUMP_IF_FALSE (D.length arr)); (* backfill 1 *)
-                            List.iter (compile_stmt arr in_loop) ss;
-                            D.set arr jump_index (JUMP (D.length arr)); (* backfill 2 *)
-                        | None ->
-                            D.set arr pop_index (POP_JUMP_IF_FALSE (D.length arr))); (* just backfill 1 *)
-   | While (c, ss)  -> let start_idx = D.length arr in
-                       compile_expr arr c;
-                       let pop_index = D.length arr in
-                       D.add arr (POP_JUMP_IF_FALSE (-1)); (* dummy *)
-                       List.iter (compile_stmt arr true) ss;
-                       D.add arr (JUMP start_idx); (* goto beginning of loop *)
-                       let end_idx = D.length arr in
-                       D.set arr pop_index (POP_JUMP_IF_FALSE end_idx); (* backfill *)
-                       (* scan over tokens that were added to backfill breaks and continues *)
-                       for i = start_idx to end_idx - 1 do
-                         match D.get arr i with
-                           JUMP t -> if t = -10 then D.set arr i (JUMP end_idx) else
-                                     if t = -20 then D.set arr i (JUMP start_idx) else ()
-                         | _      -> ()
-                       done
-   | Break          -> if not in_loop then
-                         raise (Bytecode_error "BREAK statement found outside loop.")
-                       else
-                         D.add arr (JUMP (-10)) (* -10 indicates break *)
-   | Continue       -> if not in_loop then
-                         raise (Bytecode_error "CONTINUE statement found outside loop.")
-                       else
-                         D.add arr (JUMP (-20))) (* -20 indicates continue *)
 
 (* recursively compile statements *)
 let rec compile_stmts stmts sym_scope =
+
   let is_global = match sym_scope with [] -> true | _ -> false in
   let table : local_table = H.create 10 in
+
   (* check enclosing scopes for name, return number of levels up *)
   let rec search_upwards count tables str : int option =
     match sym_scope with
@@ -152,6 +41,7 @@ let rec compile_stmts stmts sym_scope =
                              | _       -> None)
                 | None   -> search_upwards (count + 1) ts str)
   in
+
   (* resolve a single expr and return unit *)
   let rec resolve_expr (expr : Ast.expr) =
     match expr with
@@ -164,8 +54,9 @@ let rec compile_stmts stmts sym_scope =
                          resolve_expr e2
     | IntLit _ | FloatLit _ | BoolLit _ | StrLit _ | Lambda(_,_) | None -> ()
   in
+
   (* iterate through statements and resolve each one *)
-  let rec resolve_iter (stmts : Ast.stmt list) =
+  let rec resolve_stmts (stmts : Ast.stmt list) =
     match stmts with
       []    -> ()
     | s::ss -> (match s with
@@ -173,12 +64,12 @@ let rec compile_stmts stmts sym_scope =
                 | Assign(s, e)  -> H.replace table s (Local 0);
                                    resolve_expr e
                 | If(c, s1, s2) -> resolve_expr c;
-                                   resolve_iter s1;
+                                   resolve_stmts s1;
                                    (match s2 with
-                                      Some ss -> resolve_iter ss
+                                      Some ss -> resolve_stmts ss
                                     | None -> ())
                 | While(c, s)   -> resolve_expr c;
-                                   resolve_iter s
+                                   resolve_stmts s
                 | Global s      -> (match H.find_opt table s with
                                       None   -> H.add table s Global
                                     | Some _ ->
@@ -193,16 +84,147 @@ let rec compile_stmts stmts sym_scope =
                                                             (sprintf "No binding for %s found" s)))
                 | Return e      -> resolve_expr e
                 | Funcdef(_,_,_) | Break | Continue -> ());
-               resolve_iter ss
+               resolve_stmts ss
   in
-  (* iterate compile statements *)
-  let rec compile_iter arr stmts =
+
+  let instrs : Instr.t D.t = D.create () in  (* the two functions below modify this instruction array *)
+
+  (* convert an expression to bytecode and add instructions to array *)
+  let rec compile_expr (e : Ast.expr) : unit =
+    match e with
+      Var id         -> let instr : Instr.t =
+                          (match H.find_opt table id with
+                             Some (Local i) -> (LOAD_LOCAL(i, id))
+                           | Some Global
+                           | Some Referred  -> (LOAD_GLOBAL id)
+                           | None -> (LOAD_NAME id)) (* this should not happen *)
+                        in
+                        D.add instrs instr
+    | IntLit i       -> D.add instrs (LOAD_CONST (Int i))
+    | FloatLit f     -> D.add instrs (LOAD_CONST (Float f))
+    | BoolLit b      -> D.add instrs (LOAD_CONST (Bool b))
+    | StrLit s       -> D.add instrs (LOAD_CONST (Str s))
+    | Call (f, args) -> compile_expr f;
+                        List.iter compile_expr args;
+                        D.add instrs (CALL_FUNCTION (List.length args))
+    | Op (And, args) -> (match args with
+                           e1::e2::_ ->
+                             compile_expr e1;
+                             let pop_index = D.length instrs in
+                             D.add instrs (JUMP_IF_FALSE_OR_POP (-1)); (* dummy *)
+                             compile_expr e2;
+                             D.set instrs pop_index (JUMP_IF_FALSE_OR_POP (D.length instrs)) (* backfill *)
+                         | _         -> raise (Bytecode_error "Not enough arguments: AND"))
+    | Op (Or, args)  -> (match args with
+                           e1::e2::_ ->
+                             compile_expr e1;
+                             let pop_index = D.length instrs in
+                             D.add instrs (JUMP_IF_TRUE_OR_POP (-1)); (* dummy *)
+                             compile_expr e2;
+                             D.set instrs pop_index (JUMP_IF_TRUE_OR_POP (D.length instrs)) (* backfill *)
+                         | _         -> raise (Bytecode_error "Not enough arguments: OR"))
+    | Op (o, args)   -> List.iter compile_expr args;
+                        (match o with
+                         | Not    -> D.add instrs UNARY_NOT
+                         | Is     -> D.add instrs COMPARE_IS
+                         | In     -> D.add instrs COMPARE_IN
+                         | NotIn  -> D.add instrs COMPARE_IN
+                         | IsNot  -> D.add instrs COMPARE_IS_NOT
+                         | Plus   -> D.add instrs BINARY_ADD
+                         | Minus  -> D.add instrs BINARY_SUB
+                         | Times  -> D.add instrs BINARY_MULT
+                         | FpDiv  -> D.add instrs BINARY_FP_DIV
+                         | IntDiv -> D.add instrs BINARY_INT_DIV
+                         | Mod    -> D.add instrs BINARY_MOD
+                         | Exp    -> D.add instrs BINARY_EXP
+                         | Eq     -> D.add instrs COMPARE_EQ
+                         | Neq    -> D.add instrs COMPARE_NEQ
+                         | Lt     -> D.add instrs COMPARE_LT
+                         | Gt     -> D.add instrs COMPARE_GT
+                         | Leq    -> D.add instrs COMPARE_LEQ
+                         | Geq    -> D.add instrs COMPARE_GEQ
+                         | BwAnd  -> D.add instrs BINARY_BW_AND
+                         | BwOr   -> D.add instrs BINARY_BW_OR
+                         | BwComp -> D.add instrs UNARY_BW_COMP
+                         | BwXor  -> D.add instrs BINARY_BW_XOR
+                         | LShift -> D.add instrs BINARY_LSHIFT
+                         | RShift -> D.add instrs BINARY_RSHIFT
+                         | Neg    -> D.add instrs UNARY_NEG
+                         | _      -> raise (Bytecode_error "Invalid operator encountered."))
+    | Cond (c,e1,e2) -> compile_expr c;
+                        let pop_index = D.length instrs in
+                        D.add instrs (POP_JUMP_IF_FALSE (-1)); (* dummy 1 *)
+                        compile_expr e1;
+                        let jump_index = D.length instrs in
+                        D.add instrs (JUMP (-1)); (* dummy 2 *)
+                        D.set instrs pop_index (POP_JUMP_IF_FALSE (D.length instrs)); (* backfill 1 *)
+                        compile_expr e2;
+                        D.set instrs jump_index (JUMP (D.length instrs)) (* backfill 2 *)
+    | None           -> D.add instrs (LOAD_CONST None)
+  in
+
+  (* convert a statement to bytecode and append instructions to instruction array *)
+  let rec compile_stmt (in_loop : bool) (s : Ast.stmt) : unit =
+    (match s with
+       Expr e         -> compile_expr e;
+     | Assign (s, e)  -> compile_expr e;
+                         let instr : Instr.t =
+                           (match H.find_opt table s with
+                              Some (Local i) -> (STORE_LOCAL(i, s))
+                            | Some Global
+                            | Some Referred  -> (STORE_GLOBAL s)
+                            | None -> (STORE_NAME s)) (* this should not happen *)
+                         in
+                         D.add instrs instr
+     | If (c, s1, s2) -> compile_expr c;
+                         let pop_index = D.length instrs in
+                         D.add instrs (POP_JUMP_IF_FALSE (-1)); (* dummy 1 *)
+                         List.iter (compile_stmt in_loop) s1;
+                         (match s2 with
+                            Some ss ->
+                              let jump_index = D.length instrs in
+                              D.add instrs (JUMP (-1)); (* dummy 2 *)
+                              D.set instrs pop_index (POP_JUMP_IF_FALSE (D.length instrs)); (* backfill 1 *)
+                              List.iter (compile_stmt in_loop) ss;
+                              D.set instrs jump_index (JUMP (D.length instrs)); (* backfill 2 *)
+                          | None ->
+                              D.set instrs pop_index (POP_JUMP_IF_FALSE (D.length instrs))); (* just backfill 1 *)
+     | While (c, ss)  -> let start_idx = D.length instrs in
+                         compile_expr c;
+                         let pop_index = D.length instrs in
+                         D.add instrs (POP_JUMP_IF_FALSE (-1)); (* dummy *)
+                         List.iter (compile_stmt true) ss;
+                         D.add instrs (JUMP start_idx); (* goto beginning of loop *)
+                         let end_idx = D.length instrs in
+                         D.set instrs pop_index (POP_JUMP_IF_FALSE end_idx); (* backfill *)
+                         (* scan over tokens that were added to backfill breaks and continues *)
+                         for i = start_idx to end_idx - 1 do
+                           match D.get instrs i with
+                             JUMP t -> if t = -10 then D.set instrs i (JUMP end_idx) else
+                                       if t = -20 then D.set instrs i (JUMP start_idx) else ()
+                           | _      -> ()
+                         done
+     | Break          -> if not in_loop then
+                           raise (Bytecode_error "BREAK statement found outside loop.")
+                         else
+                           D.add instrs (JUMP (-10)) (* -10 indicates break *)
+     | Continue       -> if not in_loop then
+                           raise (Bytecode_error "CONTINUE statement found outside loop.")
+                         else
+                           D.add instrs (JUMP (-20))) (* -20 indicates continue *)
+  in
+
+  (* iterate and compile statements *)
+  let rec compile_iter stmts =
     match stmts with
       []    -> ()
-    | s::ss -> compile_stmt arr false s;
-               compile_iter arr ss in
-  let instrs = D.create () in
-  compile_iter instrs stmts;
+    | s::ss -> compile_stmt false s;
+               compile_iter ss
+  in
+
+  (* start routine *)
+  resolve_stmts stmts;   (* fill the hashtable of depths *)
+  compile_iter stmts;    (* compile *)
 (*
   D.add instrs (LOAD_CONST None);
   D.add instrs RETURN_VALUE;

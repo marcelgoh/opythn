@@ -292,11 +292,15 @@ let run (c : Bytecode.code) (envr : env) =
            (try s_push (Bool (not (is tos1 tos)))
             with Type_error -> raise (Runtime_error "Type mismatch: COMPARE_IS_NOT"))
        | RETURN_VALUE -> () (* TODO *)
+       | STORE_LOCAL(_, id)  (* TODO: Handle different scopes *)
+       | STORE_GLOBAL id
        | STORE_NAME id ->
            let tos = S.pop stack in
-           let scp = List.hd envr.global in
-           H.replace scp id tos
+           let scope = List.hd envr.global in
+           H.replace scope id tos
        | LOAD_CONST pv -> s_push pv
+       | LOAD_LOCAL(_, id)   (* TODO: Handle different scopes *)
+       | LOAD_GLOBAL id
        | LOAD_NAME id -> s_push @@ lookup_global envr id
        | JUMP t -> next := t
        | POP_JUMP_IF_FALSE t -> if as_bool (S.pop stack) then () else next := t
@@ -316,7 +320,8 @@ let run (c : Bytecode.code) (envr : env) =
            | _     -> raise (Runtime_error "Tried to apply non-function object: CALL_FUNCTION") in
            s_push retval
       );
-       loop !next in
+    loop !next
+  in
   (* start interpreting from the top of instructions *)
   loop 0
 
