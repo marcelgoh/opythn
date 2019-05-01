@@ -1,4 +1,4 @@
-(* instruction datatype *)
+(* Instruction datatype *)
 
 open Printf
 

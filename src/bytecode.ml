@@ -120,6 +120,28 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
 
   (* convert an expression to bytecode and add instructions to array *)
   let rec compile_expr (e : Ast.expr) : unit =
+    (* compile into (possibly nested) lambda expressions *)
+(*
+    let compile_lambda code_block name_list_list expr =
+      let curr_depth = List.length name_list_list in
+      let rec get_depth depth list_list str =
+        match list_list with
+          []    -> Nothing
+        | l::ls -> (match find_opt str l of
+                      Some _  -> Some depth
+                    | Nothing -> get_depth (depth + 1) ls str)
+      in
+      match expr with
+        Var id -> let instr: Instr.t =
+                    (match get_depth 0 name_list_list id with
+                       Some n  -> (LOAD_LOCAL(i, id))
+                     | Nothing -> (match H.find_opt table id with
+                                     Some (Local i) -> (LOAD_LOCAL(i+curr_depth, id))
+                                   | Some Global | Some Referred -> (LOAD_GLOBAL id)
+                                   | None -> (LOAD_NAME id))) (* this shouldn't happen *)
+    in
+*)
+    (* pattern match expression and compile accordingly *)
     match e with
       Var id         -> let instr : Instr.t =
                           (match H.find_opt table id with
@@ -180,7 +202,7 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
                          | RShift -> D.add instrs BINARY_RSHIFT
                          | Neg    -> D.add instrs UNARY_NEG
                          | _      -> raise (Bytecode_error "Invalid operator encountered."))
-    | Cond (c,e1,e2) -> compile_expr c;
+    | Cond(c,e1,e2)  -> compile_expr c;
                         let pop_index = D.length instrs in
                         D.add instrs (POP_JUMP_IF_FALSE (-1)); (* dummy 1 *)
                         compile_expr e1;
@@ -189,6 +211,10 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
                         D.set instrs pop_index (POP_JUMP_IF_FALSE (D.length instrs)); (* backfill 1 *)
                         compile_expr e2;
                         D.set instrs jump_index (JUMP (D.length instrs)) (* backfill 2 *)
+    | Lambda(args,b) -> let new_table = H.create 10 in
+                        List.iter (fun s -> H.add new_table s (Local 0)) args;
+                        let code_block = compile_stmts [(Ast.Expr b)] (table::enclosings) new_table in
+                        D.add instrs (MAKE_FUNCTION(args, ref code_block))
     | None           -> D.add instrs (LOAD_CONST None)
   in
 
