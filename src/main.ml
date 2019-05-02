@@ -41,9 +41,9 @@ let run_tests opy_code =
   printf "%s\n" (Ast.show tree);
   printf "************ BYTECODE ************\n";
   let instrs = Bytecode.compile_prog tree in
-  Bytecode.print_asm instrs;
-  printf "************ CONSOLE OUTPUT ************\n";
-  Interpreter.interpret instrs @@ Interpreter.init_env ()
+  Bytecode.print_asm instrs
+(*   printf "************ CONSOLE OUTPUT ************\n"; *)
+(*   Interpreter.interpret instrs @@ Interpreter.init_env () *)
 
 (* normal file input *)
 let from_file opy_code =

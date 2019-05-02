@@ -36,7 +36,9 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
 
   let is_global = match enclosings with [] -> true | _ -> false in
 
-  (* check enclosing scopes for name, return number of levels up *)
+  (* check enclosing scopes for name, return number of levels up
+   * the calling sequence should set count to 1
+   *)
   let rec search_upwards count tables str : int option =
     match tables with
       []    -> None
@@ -50,9 +52,11 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
   (* resolve a single expr and return unit *)
   let rec resolve_expr (expr : Ast.expr) =
     match expr with
-      Var s           -> (match H.find_opt table s with
+      Var s -> (match H.find_opt table s with
                             Some _ -> ()
-                          | None -> H.replace table s Referred)
+                          | None -> (match search_upwards 1 enclosings s with
+                                       Some n -> H.replace table s (Local n)
+                                     | None -> H.replace table s Referred))
     | Call(f ,es)     -> resolve_expr f;
                          List.iter resolve_expr es
     | Op(_, e)        -> List.iter resolve_expr e
@@ -71,155 +75,161 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
         H.replace table name (Local 0)
     in
     match stmts with
-      []    -> ()
-    | s::ss -> (match s with
-                  Expr e -> resolve_expr e;
-                | Assign(s, e) ->
-                    add_name s;
-                    resolve_expr e
-                | If(c, s1, s2) ->
-                    resolve_expr c;
-                    resolve_stmts s1;
-                    (match s2 with
-                       Some ss -> resolve_stmts ss
-                     | None -> ())
-                | While(c, s) ->
-                    resolve_expr c;
-                    resolve_stmts s
-                | Global s ->
-                    (match H.find_opt table s with
-                       None   -> H.add table s Global
-                     | Some _ ->
-                         if is_global then ()
-                         else
-                           raise
-                           (Bytecode_error (sprintf "Name `%s` used before global declaration" s)))
-                | Nonlocal s ->
-                    if is_global then
-                      raise (Bytecode_error "Nonlocal declared in global scope")
-                    else
-                      (match H.find_opt table s with
-                         Some _ ->
-                           raise
-                             (Bytecode_error (sprintf "Name `%s` used before nonlocal declaration" s))
-                       | None ->
-                           (match search_upwards 1 enclosings s with
-                              Some num -> H.add table s (Local num)
-                            | None ->
-                                raise (Bytecode_error (sprintf "No binding for %s found" s))))
-                | Return e      -> resolve_expr e
-                (* we don't resolve inside function declarations *)
-                | Funcdef(name, _, _) ->
-                    add_name name
-                | Break | Continue -> ());
-               resolve_stmts ss
+      [] -> ()
+    | s::ss ->
+        (match s with
+           Expr e -> resolve_expr e;
+         | Assign(s, e) ->
+             add_name s;
+             resolve_expr e
+         | If(c, s1, s2) ->
+             resolve_expr c;
+             resolve_stmts s1;
+             (match s2 with
+                Some ss -> resolve_stmts ss
+              | None -> ())
+         | While(c, s) ->
+             resolve_expr c;
+             resolve_stmts s
+         | Global s ->
+             (match H.find_opt table s with
+                None   -> H.add table s Global
+              | Some _ ->
+                  if is_global then ()
+                  else
+                    raise
+                    (Bytecode_error (sprintf "Name `%s` used before global declaration" s)))
+         | Nonlocal s ->
+             if is_global then
+               raise (Bytecode_error "Nonlocal declared in global scope")
+             else
+               (match H.find_opt table s with
+                  Some _ ->
+                    raise
+                      (Bytecode_error (sprintf "Name `%s` used before nonlocal declaration" s))
+                | None ->
+                    (match search_upwards 1 enclosings s with
+                       Some num -> H.add table s (Local num)
+                     | None ->
+                         raise (Bytecode_error (sprintf "No binding for %s found" s))))
+         | Return e      -> resolve_expr e
+         (* we don't resolve inside function declarations *)
+         | Funcdef(name, _, _) ->
+             add_name name
+         | Break | Continue -> ());
+        resolve_stmts ss
   in
 
   (* the two functions below modify this instruction array *)
   let instrs : Instr.t D.t = D.create () in
 
   (* convert an expression to bytecode and add instructions to array *)
-  let rec compile_expr (e : Ast.expr) : unit =
-    (* compile into (possibly nested) lambda expressions *)
-(*
-    let compile_lambda code_block name_list_list expr =
-      let curr_depth = List.length name_list_list in
-      let rec get_depth depth list_list str =
-        match list_list with
-          []    -> Nothing
-        | l::ls -> (match find_opt str l of
-                      Some _  -> Some depth
-                    | Nothing -> get_depth (depth + 1) ls str)
-      in
-      match expr with
-        Var id -> let instr: Instr.t =
-                    (match get_depth 0 name_list_list id with
-                       Some n  -> (LOAD_LOCAL(i, id))
-                     | Nothing -> (match H.find_opt table id with
-                                     Some (Local i) -> (LOAD_LOCAL(i+curr_depth, id))
-                                   | Some Global | Some Referred -> (LOAD_GLOBAL id)
-                                   | None -> (LOAD_NAME id))) (* this shouldn't happen *)
+  let rec compile_expr (lambdas : string list list) (e : Ast.expr) : code =
+    (* local instruction array for compiling expressions *)
+    let expr_instrs = D.create () in
+    let compile_and_add_expr expr = D.append (compile_expr [] expr) expr_instrs in
+    (* search list of list of lambda arguments
+     * calling sequence should set count to 0
+     *)
+    let rec search_lambdas count lambdas id =
+      match lambdas with
+        []    -> None
+      | l::ls -> if List.mem id l then Some count
+                 else search_lambdas (count + 1) ls id
     in
-*)
     (* pattern match expression and compile accordingly *)
-    match e with
-      Var id         -> let instr : Instr.t =
-                          (match H.find_opt table id with
-                             Some (Local i) -> (LOAD_LOCAL(i, id))
-                           | Some Global
-                           | Some Referred  -> (LOAD_GLOBAL id)
-                           | None -> (LOAD_NAME id)) (* this should not happen *)
-                        in
-                        D.add instrs instr
-    | IntLit i       -> D.add instrs (LOAD_CONST (Int i))
-    | FloatLit f     -> D.add instrs (LOAD_CONST (Float f))
-    | BoolLit b      -> D.add instrs (LOAD_CONST (Bool b))
-    | StrLit s       -> D.add instrs (LOAD_CONST (Str s))
-    | Call (f, args) -> compile_expr f;
-                        List.iter compile_expr args;
-                        D.add instrs (CALL_FUNCTION (List.length args))
-    | Op (And, args) -> (match args with
-                           e1::e2::_ ->
-                             compile_expr e1;
-                             let pop_index = D.length instrs in
-                             D.add instrs (JUMP_IF_FALSE_OR_POP (-1)); (* dummy *)
-                             compile_expr e2;
-                             D.set instrs pop_index (JUMP_IF_FALSE_OR_POP (D.length instrs)) (* backfill *)
-                         | _         -> raise (Bytecode_error "Not enough arguments: AND"))
-    | Op (Or, args)  -> (match args with
-                           e1::e2::_ ->
-                             compile_expr e1;
-                             let pop_index = D.length instrs in
-                             D.add instrs (JUMP_IF_TRUE_OR_POP (-1)); (* dummy *)
-                             compile_expr e2;
-                             D.set instrs pop_index (JUMP_IF_TRUE_OR_POP (D.length instrs)) (* backfill *)
-                         | _         -> raise (Bytecode_error "Not enough arguments: OR"))
-    | Op (o, args)   -> List.iter compile_expr args;
-                        (match o with
-                         | Not    -> D.add instrs UNARY_NOT
-                         | Is     -> D.add instrs COMPARE_IS
-                         | In     -> D.add instrs COMPARE_IN
-                         | NotIn  -> D.add instrs COMPARE_IN
-                         | IsNot  -> D.add instrs COMPARE_IS_NOT
-                         | Plus   -> D.add instrs BINARY_ADD
-                         | Minus  -> D.add instrs BINARY_SUB
-                         | Times  -> D.add instrs BINARY_MULT
-                         | FpDiv  -> D.add instrs BINARY_FP_DIV
-                         | IntDiv -> D.add instrs BINARY_INT_DIV
-                         | Mod    -> D.add instrs BINARY_MOD
-                         | Exp    -> D.add instrs BINARY_EXP
-                         | Eq     -> D.add instrs COMPARE_EQ
-                         | Neq    -> D.add instrs COMPARE_NEQ
-                         | Lt     -> D.add instrs COMPARE_LT
-                         | Gt     -> D.add instrs COMPARE_GT
-                         | Leq    -> D.add instrs COMPARE_LEQ
-                         | Geq    -> D.add instrs COMPARE_GEQ
-                         | BwAnd  -> D.add instrs BINARY_BW_AND
-                         | BwOr   -> D.add instrs BINARY_BW_OR
-                         | BwComp -> D.add instrs UNARY_BW_COMP
-                         | BwXor  -> D.add instrs BINARY_BW_XOR
-                         | LShift -> D.add instrs BINARY_LSHIFT
-                         | RShift -> D.add instrs BINARY_RSHIFT
-                         | Neg    -> D.add instrs UNARY_NEG
-                         | _      -> raise (Bytecode_error "Invalid operator encountered."))
-    | Cond(c,e1,e2)  -> compile_expr c;
-                        let pop_index = D.length instrs in
-                        D.add instrs (POP_JUMP_IF_FALSE (-1)); (* dummy 1 *)
-                        compile_expr e1;
-                        let jump_index = D.length instrs in
-                        D.add instrs (JUMP (-1)); (* dummy 2 *)
-                        D.set instrs pop_index (POP_JUMP_IF_FALSE (D.length instrs)); (* backfill 1 *)
-                        compile_expr e2;
-                        D.set instrs jump_index (JUMP (D.length instrs)) (* backfill 2 *)
-    | Lambda(args,b) -> let new_table = H.create 10 in
-                        List.iter (fun s -> H.add new_table s (Local 0)) args;
-                        let code_block = compile_stmts [(Ast.Expr b)] (table::enclosings) new_table in
-                        D.add instrs (MAKE_FUNCTION(args, ref code_block))
-    | None           -> D.add instrs (LOAD_CONST None)
+    (match e with
+       Var id ->
+         let instr : Instr.t =
+           (match search_lambdas 0 lambdas id with
+              Some n -> (LOAD_LOCAL(n, id))
+            | None ->
+                (match H.find_opt table id with
+                   Some (Local i) -> (LOAD_LOCAL(i + List.length lambdas, id))
+                 | Some Global
+                 | Some Referred  -> (LOAD_GLOBAL id)
+                 | None -> (LOAD_NAME id))) (* this should not happen *)
+         in
+         D.add expr_instrs instr
+     | IntLit i -> D.add expr_instrs (LOAD_CONST (Int i))
+     | FloatLit f -> D.add expr_instrs (LOAD_CONST (Float f))
+     | BoolLit b -> D.add expr_instrs (LOAD_CONST (Bool b))
+     | StrLit s -> D.add expr_instrs (LOAD_CONST (Str s))
+     | Call (f, args) ->
+         compile_and_add_expr f;
+         List.iter compile_and_add_expr args;
+         D.add expr_instrs (CALL_FUNCTION (List.length args))
+     | Op (And, args) ->
+         (match args with
+            e1::e2::_ ->
+              compile_and_add_expr e1;
+              let pop_index = D.length expr_instrs in
+              D.add expr_instrs (JUMP_IF_FALSE_OR_POP (-1)); (* dummy *)
+              compile_and_add_expr e2;
+              D.set expr_instrs pop_index (JUMP_IF_FALSE_OR_POP (D.length expr_instrs)) (* backfill *)
+          | _ -> raise (Bytecode_error "Not enough arguments: AND"))
+     | Op (Or, args) ->
+         (match args with
+            e1::e2::_ ->
+              compile_and_add_expr e1;
+              let pop_index = D.length expr_instrs in
+              D.add expr_instrs (JUMP_IF_TRUE_OR_POP (-1)); (* dummy *)
+              compile_and_add_expr e2;
+              D.set expr_instrs pop_index (JUMP_IF_TRUE_OR_POP (D.length expr_instrs)) (* backfill *)
+          | _ -> raise (Bytecode_error "Not enough arguments: OR"))
+     | Op (o, args) ->
+         List.iter compile_and_add_expr args;
+         (match o with
+          | Not    -> D.add expr_instrs UNARY_NOT
+          | Is     -> D.add expr_instrs COMPARE_IS
+          | In     -> D.add expr_instrs COMPARE_IN
+          | NotIn  -> D.add expr_instrs COMPARE_IN
+          | IsNot  -> D.add expr_instrs COMPARE_IS_NOT
+          | Plus   -> D.add expr_instrs BINARY_ADD
+          | Minus  -> D.add expr_instrs BINARY_SUB
+          | Times  -> D.add expr_instrs BINARY_MULT
+          | FpDiv  -> D.add expr_instrs BINARY_FP_DIV
+          | IntDiv -> D.add expr_instrs BINARY_INT_DIV
+          | Mod    -> D.add expr_instrs BINARY_MOD
+          | Exp    -> D.add expr_instrs BINARY_EXP
+          | Eq     -> D.add expr_instrs COMPARE_EQ
+          | Neq    -> D.add expr_instrs COMPARE_NEQ
+          | Lt     -> D.add expr_instrs COMPARE_LT
+          | Gt     -> D.add expr_instrs COMPARE_GT
+          | Leq    -> D.add expr_instrs COMPARE_LEQ
+          | Geq    -> D.add expr_instrs COMPARE_GEQ
+          | BwAnd  -> D.add expr_instrs BINARY_BW_AND
+          | BwOr   -> D.add expr_instrs BINARY_BW_OR
+          | BwComp -> D.add expr_instrs UNARY_BW_COMP
+          | BwXor  -> D.add expr_instrs BINARY_BW_XOR
+          | LShift -> D.add expr_instrs BINARY_LSHIFT
+          | RShift -> D.add expr_instrs BINARY_RSHIFT
+          | Neg    -> D.add expr_instrs UNARY_NEG
+          | _      -> raise (Bytecode_error "Invalid operator encountered."))
+     | Cond(c,e1,e2) ->
+         compile_and_add_expr c;
+         let pop_index = D.length expr_instrs in
+         D.add expr_instrs (POP_JUMP_IF_FALSE (-1)); (* dummy 1 *)
+         compile_and_add_expr e1;
+         let jump_index = D.length expr_instrs in
+         D.add expr_instrs (JUMP (-1)); (* dummy 2 *)
+         D.set expr_instrs pop_index (POP_JUMP_IF_FALSE (D.length expr_instrs)); (* backfill 1 *)
+         compile_and_add_expr e2;
+         D.set expr_instrs jump_index (JUMP (D.length expr_instrs)) (* backfill 2 *)
+     | Lambda(args,b) ->
+         let new_table = H.create 10 in
+         List.iter (fun s -> H.add new_table s (Local 0)) args;
+         let code_block = compile_expr (args :: lambdas) b in
+         D.add code_block RETURN_VALUE;
+         D.add expr_instrs (MAKE_FUNCTION(args, ref code_block))
+     | None -> D.add expr_instrs (LOAD_CONST None)
+    );
+    expr_instrs
   in
 
   (* convert a statement to bytecode and append instructions to instruction array *)
   let rec compile_stmt (in_loop : bool) (s : Ast.stmt) : unit =
+    let compile_and_add_expr expr = D.append (compile_expr [] expr) instrs in
     let compile_id id =
       let instr : Instr.t =
         (match H.find_opt table id with
@@ -231,10 +241,10 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
       D.add instrs instr
     in
     (match s with
-       Expr e -> compile_expr e;
-     | Assign (id, e) -> compile_expr e; compile_id id
+       Expr e -> compile_and_add_expr e;
+     | Assign (id, e) -> compile_and_add_expr e; compile_id id
      | If (c, s1, s2) ->
-         compile_expr c;
+         compile_and_add_expr c;
          let pop_index = D.length instrs in
          D.add instrs (POP_JUMP_IF_FALSE (-1)); (* dummy 1 *)
          List.iter (compile_stmt in_loop) s1;
@@ -249,7 +259,7 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
               D.set instrs pop_index (POP_JUMP_IF_FALSE (D.length instrs))); (* just backfill 1 *)
      | While (c, ss) ->
          let start_idx = D.length instrs in
-         compile_expr c;
+         compile_and_add_expr c;
          let pop_index = D.length instrs in
          D.add instrs (POP_JUMP_IF_FALSE (-1)); (* dummy *)
          List.iter (compile_stmt true) ss;
@@ -270,7 +280,7 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
          D.add instrs (MAKE_FUNCTION (args, ref code_block));
          compile_id name
      | Return e ->
-         compile_expr e;
+         compile_and_add_expr e;
          D.add instrs RETURN_VALUE
      | Break ->
          if not in_loop then
