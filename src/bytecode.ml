@@ -53,13 +53,13 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
   let rec resolve_expr (expr : Ast.expr) =
     match expr with
       Var s -> (match H.find_opt table s with
-                            Some _ -> ()
-                          | None -> (match search_upwards 1 enclosings s with
-                                       Some n -> H.replace table s (Local n)
-                                     | None -> H.replace table s Referred))
-    | Call(f ,es)     -> resolve_expr f;
-                         List.iter resolve_expr es
-    | Op(_, e)        -> List.iter resolve_expr e
+                  Some _ -> ()
+                | None -> (match search_upwards 1 enclosings s with
+                             Some n -> H.replace table s (Local n)
+                           | None -> H.replace table s Referred))
+    | Call(f ,es) -> resolve_expr f;
+                     List.iter resolve_expr es
+    | Op(_, e) -> List.iter resolve_expr e
     | Cond(e1, c, e2) -> resolve_expr e1;
                          resolve_expr c;
                          resolve_expr e2
@@ -127,7 +127,7 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
   let rec compile_expr (lambdas : string list list) (e : Ast.expr) : code =
     (* local instruction array for compiling expressions *)
     let expr_instrs = D.create () in
-    let compile_and_add_expr expr = D.append (compile_expr [] expr) expr_instrs in
+    let compile_and_add_expr expr = D.append (compile_expr lambdas expr) expr_instrs in
     (* search list of list of lambda arguments
      * calling sequence should set count to 0
      *)
@@ -271,7 +271,7 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
            match D.get instrs i with
              JUMP t -> if t = -10 then D.set instrs i (JUMP end_idx) else
                        if t = -20 then D.set instrs i (JUMP start_idx) else ()
-           | _      -> ()
+           | _ -> ()
          done
      | Funcdef (name, args, body) ->
          let new_table = H.create 10 in
@@ -299,7 +299,7 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
   (* iterate and compile statements *)
   let rec compile_iter stmts =
     match stmts with
-      []    -> ()
+      [] -> ()
     | s::ss -> compile_stmt false s;
                compile_iter ss
   in
