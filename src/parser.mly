@@ -55,7 +55,7 @@
 %left PLUS MINUS
 %left TIMES FP_DIV INT_DIV MOD
 %right EXP
-(* %right LSQUARE LPAREN DOT RPAREN *)
+%left LPAREN
 
 (* type declarations *)
 %start <Ast.program> input
@@ -80,7 +80,6 @@
 %type <Ast.op> comp_op
 %type <Ast.expr> expr
 %type <Ast.stmt> aug_assign
-%type <Ast.expr> primary
 %type <Ast.expr> atom
 %type <Ast.expr> call
 %type <Ast.expr list> argument_list
@@ -172,7 +171,8 @@ comp_op:
 | GEQ { Geq } | NEQ { Neq } | IN { In } | NOT_IN { NotIn }
 | IS { Is }   | IS_NOT { IsNot }
 expr:
-  p = primary { p }
+  a = atom { a }
+| c = call { c }
 | e1 = expr; BW_OR; e2 = expr { Op(BwOr, [e1; e2]) }
 | e1 = expr; BW_XOR; e2 = expr { Op(BwXor, [e1; e2]) }
 | e1 = expr; BW_AND; e2 = expr { Op(BwAnd, [e1; e2]) }
@@ -212,9 +212,6 @@ aug_assign:
 | v = ID; INT_DIV_A; e = expr { Assign(v, Op(IntDiv, [Var v; e])) }
 | v = ID; MOD_A; e = expr { Assign(v, Op(Mod, [Var v; e])) }
 | v = ID; EXP_A; e = expr { Assign(v, Op(Exp, [Var v; e])) }
-primary:
-  a = atom { a }
-| c = call { c }
 atom:
   v = ID { Var v }
 | i = INT { IntLit i }
@@ -224,10 +221,10 @@ atom:
 | FALSE { BoolLit false }
 | NONE { None }
 call:
-  p = primary; LPAREN; args = argument_list?; RPAREN {
+  e = expr; LPAREN; args = argument_list?; RPAREN {
     match args with
-      Some l -> Call(p, l)
-    | None   -> Call(p, [])
+      Some l -> Call(e, l)
+    | None   -> Call(e, [])
   }
 argument_list:
   e = expr { [e] }
