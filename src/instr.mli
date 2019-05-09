@@ -25,12 +25,10 @@ type t =
 (* return TOS to caller *)
 | RETURN_VALUE
 (* operations with arguments *)
-| STORE_NAME of (* name : *) string                      (* name = TOS *)
-| STORE_LOCAL of (* depth : *) int * (* name : *) string
+| STORE_LOCAL of (* depth : *) int * (* name : *) string (* name = TOS *)
 | STORE_GLOBAL of (* name : *) string
 | LOAD_CONST of (* value : *) Py_val.t                   (* TOS = value *)
-| LOAD_NAME of (* name : *) string                       (* TOS = name *)
-| LOAD_LOCAL of (* depth : *) int * (* name : *) string
+| LOAD_LOCAL of (* depth : *) int * (* name : *) string  (* TOS = name *)
 | LOAD_GLOBAL of (* name : *) string
 | JUMP of (* target : *) int
 | POP_JUMP_IF_FALSE of (* target : *) int

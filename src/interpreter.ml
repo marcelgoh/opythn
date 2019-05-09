@@ -308,18 +308,16 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
              (match List.nth_opt envr.locals n with
                 None -> raise (Runtime_error "Tried to access non-existent scope: STORE_LOCAL")
               | Some scope -> store_name scope id)
-         | STORE_GLOBAL id
-         | STORE_NAME id -> store_name (List.hd envr.globals) id
+         | STORE_GLOBAL id -> store_name (List.hd envr.globals) id
          | LOAD_CONST pv -> s_push pv
          | LOAD_LOCAL(n, id) ->
              (match List.nth_opt envr.locals n with
                 None -> raise (Runtime_error "Tried to access non-existent scope: LOAD_LOCAL")
               | Some scope ->
                   (match H.find_opt scope id with
-                     None -> raise (Runtime_error "Variable \"%s\" not found: LOAD_LOCAL")
+                     None -> raise (Runtime_error (sprintf "Variable \"%s\" not found: LOAD_LOCAL" id))
                    | Some pv -> s_push pv))
-         | LOAD_GLOBAL id
-         | LOAD_NAME id -> s_push @@ lookup_global envr id
+         | LOAD_GLOBAL id -> s_push @@ lookup_global envr id
          | JUMP t -> next := t
          | POP_JUMP_IF_FALSE t -> if as_bool (S.pop stack) then () else next := t
          | JUMP_IF_TRUE_OR_POP t ->

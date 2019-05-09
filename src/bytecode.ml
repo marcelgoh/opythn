@@ -36,23 +36,36 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
 
   let is_global = match enclosings with [] -> true | _ -> false in
 
+  (* where nonlocals are stored before they're actually used *)
+  let nonlocals = H.create 10 in
+
+  (* check both non-local and local tables *)
+  let check_tables_opt str =
+    match H.find_opt table str with
+      Some depth -> Some depth
+    | None ->
+        (match H.find_opt nonlocals str with
+           Some d -> Some d
+         | None -> None)
+  in
+
   (* check enclosing scopes for name, return number of levels up
-   * the calling sequence should set count to 1
+   * calling sequence should set count to 1
    *)
   let rec search_upwards count tables str : int option =
     match tables with
       []    -> None
     | t::ts -> (match H.find_opt t str with
                   Some d -> (match d with
-                               Local _ -> Some count
-                             | _       -> None)
+                              Local _ -> Some count
+                             | _ -> None)
                 | None   -> search_upwards (count + 1) ts str)
   in
 
   (* resolve a single expr and return unit *)
   let rec resolve_expr (expr : Ast.expr) =
     match expr with
-      Var s -> (match H.find_opt table s with
+      Var s -> (match check_tables_opt s with
                   Some _ -> ()
                 | None -> (match search_upwards 1 enclosings s with
                              Some n -> H.replace table s (Local n)
@@ -69,10 +82,11 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
   (* iterate through statements and resolve each one *)
   let rec resolve_stmts (stmts : Ast.stmt list) =
     let add_name name =
-      if is_global then
-        H.replace table name Global
-      else
-        H.replace table name (Local 0)
+      let depth_to_add = if is_global then Global else (Local 0) in
+        match check_tables_opt name with
+          (* the only time a nonlocal shifts over to local table *)
+          Some d -> H.replace table name d
+        | None -> H.replace table name depth_to_add
     in
     match stmts with
       [] -> ()
@@ -80,8 +94,8 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
         (match s with
            Expr e -> resolve_expr e;
          | Assign(s, e) ->
-             add_name s;
-             resolve_expr e
+             resolve_expr e;
+             add_name s
          | If(c, s1, s2) ->
              resolve_expr c;
              resolve_stmts s1;
@@ -92,8 +106,8 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
              resolve_expr c;
              resolve_stmts s
          | Global s ->
-             (match H.find_opt table s with
-                None   -> H.add table s Global
+             (match check_tables_opt s with
+                None   -> H.replace table s Global
               | Some _ ->
                   if is_global then ()
                   else
@@ -109,10 +123,10 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
                       (Bytecode_error (sprintf "Name `%s` used before nonlocal declaration" s))
                 | None ->
                     (match search_upwards 1 enclosings s with
-                       Some num -> H.add table s (Local num)
+                       Some num -> H.replace nonlocals s (Local num)
                      | None ->
                          raise (Bytecode_error (sprintf "No binding for %s found" s))))
-         | Return e      -> resolve_expr e
+         | Return e -> resolve_expr e
          (* we don't resolve inside function declarations *)
          | Funcdef(name, _, _) ->
              add_name name
@@ -144,11 +158,11 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
            (match search_lambdas 0 lambdas id with
               Some n -> (LOAD_LOCAL(n, id))
             | None ->
-                (match H.find_opt table id with
+                (match check_tables_opt id with
                    Some (Local i) -> (LOAD_LOCAL(i + List.length lambdas, id))
                  | Some Global
                  | Some Referred  -> (LOAD_GLOBAL id)
-                 | None -> (LOAD_NAME id))) (* this should not happen *)
+                 | None -> raise (Bytecode_error (sprintf "Variable `%s`'s scope not resolved: VAR" id))))
          in
          D.add expr_instrs instr
      | IntLit i -> D.add expr_instrs (LOAD_CONST (Int i))
@@ -218,7 +232,7 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
          D.set expr_instrs jump_index (JUMP (D.length expr_instrs)) (* backfill 2 *)
      | Lambda(args,b) ->
          let new_table = H.create 10 in
-         List.iter (fun s -> H.add new_table s (Local 0)) args;
+         List.iter (fun s -> H.replace new_table s (Local 0)) args;
          let code_block = compile_expr (args :: lambdas) b in
          D.add code_block RETURN_VALUE;
          D.add expr_instrs (MAKE_FUNCTION(args, ref code_block))
@@ -232,11 +246,11 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
     let compile_and_add_expr expr = D.append (compile_expr [] expr) instrs in
     let compile_id id =
       let instr : Instr.t =
-        (match H.find_opt table id with
+        (match check_tables_opt id with
            Some (Local n) -> (STORE_LOCAL(n, id))
          | Some Global
          | Some Referred  -> (STORE_GLOBAL id)
-         | None -> (STORE_NAME id)) (* this should not happen *)
+         | None -> raise (Bytecode_error (sprintf "Variable `%s`'s scope not resolved: COMPILE_ID" id)))
       in
       D.add instrs instr
     in
@@ -275,7 +289,7 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
          done
      | Funcdef (name, args, body) ->
          let new_table = H.create 10 in
-         List.iter (fun s -> H.add new_table s (Local 0)) args;
+         List.iter (fun s -> H.replace new_table s (Local 0)) args;
          let code_block : code = compile_stmts body (table::enclosings) new_table in
          D.add instrs (MAKE_FUNCTION (args, ref code_block));
          compile_id name
@@ -306,6 +320,7 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
 
   (* start routine *)
   resolve_stmts stmts;   (* fill the hashtable of depths *)
+(*   H.iter print_entry table; *)
   compile_iter stmts;    (* compile *)
   instrs
 
