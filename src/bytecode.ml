@@ -93,9 +93,11 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
     | s::ss ->
         (match s with
            Expr e -> resolve_expr e;
-         | Assign(s, e) ->
+         | Assign(Var s, e) ->
              resolve_expr e;
              add_name s
+         | Assign(_, _) ->
+             raise (Bytecode_error "Tried to assign to non-assignable expression")
          | If(c, s1, s2) ->
              resolve_expr c;
              resolve_stmts s1;
@@ -256,7 +258,9 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
     in
     (match s with
        Expr e -> compile_and_add_expr e;
-     | Assign (id, e) -> compile_and_add_expr e; compile_id id
+     | Assign (Var id, e) -> compile_and_add_expr e; compile_id id
+     | Assign(_, _) ->
+         raise (Bytecode_error "Tried to assign to non-assignable expression")
      | If (c, s1, s2) ->
          compile_and_add_expr c;
          let pop_index = D.length instrs in

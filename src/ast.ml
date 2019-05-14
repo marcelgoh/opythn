@@ -20,18 +20,21 @@ type expr =
 | Op of op * expr list
 | Cond of expr * expr * expr (* ternary expression *)
 | Lambda of string list * expr    (* anonymous function *)
+| AttrRef of expr * expr
 | None
 [@@deriving show]
 
 type stmt =
   Expr of expr
-| Assign of string * expr
+| Assign of expr * expr
 | If of expr * stmt list * ((stmt list) option)
 | While of expr * stmt list
 | Funcdef of string * string list * stmt list
 | Global of string     (* one declaration at a time *)
 | Nonlocal of string
 | Return of expr       (* return only one expression *)
+| Classdef of string * string list * stmt list
+| Pass
 | Break
 | Continue
 [@@deriving show]

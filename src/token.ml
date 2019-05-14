@@ -8,6 +8,7 @@ type token =
 | IF    | ELIF   | ELSE
 | WHILE | BREAK  | CONTINUE
 | DEF   | GLOBAL | NONLOCAL | RETURN | LAMBDA
+| CLASS | PASS
 (* word-like operators *)
 | AND | OR | NOT | IS | IN | NOT_IN | IS_NOT
 (* symbolic operators *)

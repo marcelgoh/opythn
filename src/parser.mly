@@ -23,6 +23,7 @@
 %token IF      %token ELIF   %token ELSE
 %token WHILE   %token BREAK  %token CONTINUE
 %token DEF     %token GLOBAL %token NONLOCAL %token RETURN %token LAMBDA
+%token CLASS   %token PASS
 (* word-like operators *)
 %token AND %token OR %token NOT %token IS %token IN %token NOT_IN %token IS_NOT
 (* symbolic operators *)
@@ -33,7 +34,7 @@
 %token BW_XOR  %token LSHIFT %token RSHIFT
 (* delimiters *)
 %token LPAREN   %token RPAREN(* %token LSQUARE  %token RSQUARE
-%token LCURLY   %token RCURLY   %token DOT  *)  %token COMMA
+%token LCURLY   %token RCURLY *)%token DOT     %token COMMA
 %token COLON    %token SEMIC    %token ASSIG    %token PLUS_A
 %token MINUS_A  %token TIMES_A  %token FP_DIV_A %token INT_DIV_A
 %token MOD_A    %token EXP_A    %token BW_AND_A %token BW_OR_A
@@ -55,6 +56,7 @@
 %left PLUS MINUS
 %left TIMES FP_DIV INT_DIV MOD
 %right EXP
+%left DOT
 %left LPAREN
 
 (* type declarations *)
@@ -74,11 +76,13 @@
 %type <Ast.stmt> while_stmt
 %type <Ast.stmt list> suite
 %type <Ast.stmt list list> deep_suite
+%type <Ast.stmt> assignment_stmt
 %type <Ast.stmt> expr_stmt
 %type <Ast.expr> assignable_expr
 %type <Ast.expr> cond_expr
 %type <Ast.op> comp_op
 %type <Ast.expr> expr
+%type <Ast.expr> attributeref
 %type <Ast.stmt> aug_assign
 %type <Ast.expr> atom
 %type <Ast.expr> call
@@ -88,6 +92,8 @@
 %type <Ast.stmt> return_stmt
 %type <Ast.stmt> global_stmt
 %type <Ast.stmt> nonlocal_stmt
+%type <Ast.stmt> classdef
+%type <string list> class_params
 
 %% (* list of production rules *)
 
@@ -117,16 +123,20 @@ small_stmt:
 | s = flow_stmt { s }
 | s = global_stmt { s }
 | s = nonlocal_stmt { s }
+| s = pass_stmt { s }
 flow_stmt:
   BREAK { Break }
 | CONTINUE { Continue }
 | s = return_stmt { s }
+pass_stmt:
+  PASS { Pass }
 
 (* compound statements *)
 compound_stmt:
   s = if_stmt { s }
 | s = while_stmt { s }
 | s = funcdef { s }
+| s = classdef { s }
 condition:
   t = expr { t }
 | c = cond_expr { c }
@@ -152,12 +162,15 @@ suite:
 deep_suite:
   s = simple_stmt; NEWLINE { [s] }
 | NEWLINE; INDENT; ss = stmt+; DEDENT { ss }
+assignment_stmt:
+  s = ID; ASSIG; e = assignable_expr { Assign(Var s, e) }
+| target = attributeref; ASSIG; e = assignable_expr { Assign(target, e) }
 
 (* EXPRESSIONS *)
 expr_stmt:
   e = expr { Expr e }
 | c = cond_expr { Expr c }
-| s = ID; ASSIG; e = assignable_expr { Assign(s, e) }
+| a = assignment_stmt { a }
 | a = aug_assign { a }
 assignable_expr:
   e = expr { e }
@@ -173,6 +186,7 @@ comp_op:
 expr:
   a = atom { a }
 | c = call { c }
+| a = attributeref { a }
 | e1 = expr; BW_OR; e2 = expr { Op(BwOr, [e1; e2]) }
 | e1 = expr; BW_XOR; e2 = expr { Op(BwXor, [e1; e2]) }
 | e1 = expr; BW_AND; e2 = expr { Op(BwAnd, [e1; e2]) }
@@ -199,19 +213,22 @@ expr:
 | LAMBDA; args = param_id_list; COLON; body = expr {
     Lambda(args, body)
   } %prec LAMBDA
+(* attribute reference *)
+attributeref:
+  e1 = expr; DOT; e2 = expr { AttrRef(e1, e2) }
 aug_assign:
-  v = ID; BW_OR_A; e = expr { Assign(v, Op(BwOr, [Var v; e])) }
-| v = ID; BW_XOR_A; e = expr { Assign(v, Op(BwXor, [Var v; e])) }
-| v = ID; BW_AND_A; e = expr { Assign(v, Op(BwAnd, [Var v; e])) }
-| v = ID; LSHIFT_A; e = expr { Assign(v, Op(LShift, [Var v; e])) }
-| v = ID; RSHIFT_A; e = expr { Assign(v, Op(RShift, [Var v; e])) }
-| v = ID; PLUS_A; e = expr { Assign(v, Op(Plus, [Var v; e])) }
-| v = ID; MINUS_A; e = expr { Assign(v, Op(Minus, [Var v; e])) }
-| v = ID; TIMES_A; e = expr { Assign(v, Op(Times, [Var v; e])) }
-| v = ID; FP_DIV_A; e = expr { Assign(v, Op(FpDiv, [Var v; e])) }
-| v = ID; INT_DIV_A; e = expr { Assign(v, Op(IntDiv, [Var v; e])) }
-| v = ID; MOD_A; e = expr { Assign(v, Op(Mod, [Var v; e])) }
-| v = ID; EXP_A; e = expr { Assign(v, Op(Exp, [Var v; e])) }
+  v = ID; BW_OR_A; e = expr { Assign(Var v, Op(BwOr, [Var v; e])) }
+| v = ID; BW_XOR_A; e = expr { Assign(Var v, Op(BwXor, [Var v; e])) }
+| v = ID; BW_AND_A; e = expr { Assign(Var v, Op(BwAnd, [Var v; e])) }
+| v = ID; LSHIFT_A; e = expr { Assign(Var v, Op(LShift, [Var v; e])) }
+| v = ID; RSHIFT_A; e = expr { Assign(Var v, Op(RShift, [Var v; e])) }
+| v = ID; PLUS_A; e = expr { Assign(Var v, Op(Plus, [Var v; e])) }
+| v = ID; MINUS_A; e = expr { Assign(Var v, Op(Minus, [Var v; e])) }
+| v = ID; TIMES_A; e = expr { Assign(Var v, Op(Times, [Var v; e])) }
+| v = ID; FP_DIV_A; e = expr { Assign(Var v, Op(FpDiv, [Var v; e])) }
+| v = ID; INT_DIV_A; e = expr { Assign(Var v, Op(IntDiv, [Var v; e])) }
+| v = ID; MOD_A; e = expr { Assign(Var v, Op(Mod, [Var v; e])) }
+| v = ID; EXP_A; e = expr { Assign(Var v, Op(Exp, [Var v; e])) }
 atom:
   v = ID { Var v }
 | i = INT { IntLit i }
@@ -245,3 +262,16 @@ global_stmt:
   GLOBAL; i = ID { Global i }
 nonlocal_stmt:
   NONLOCAL; i = ID { Nonlocal i }
+(* class declarations and statements *)
+classdef:
+  CLASS; name = ID; args = class_params?; COLON; body = suite {
+    match args with
+      None   -> Classdef(name, [], body)
+    | Some a -> Classdef(name, a, body)
+  }
+class_params:
+  LPAREN; args = param_id_list?; RPAREN {
+    match args with
+      Some a -> a
+    | None   -> []
+  }
