@@ -42,3 +42,25 @@ y = "bye"
 z = x + y
 print(z)                # hibye
 
+## TEST SOME BUILT-INS ##
+print(bin(-34))
+print(bin(344))
+print(bool("skdlfja"))
+print(bool(""))
+print(bool(4.4))
+print(bool(0.0))
+print(bool(0))
+print(bool())
+print(bool(None))
+print(chr(65))
+print(chr(97))
+print(chr(97+25))
+print(hex(435))
+print(hex(0))
+print(hex(-34))
+print(oct(435))
+print(oct(0))
+print(oct(-34))
+print(ord("5"))
+print(ord('A'))
+print(ord('$'))

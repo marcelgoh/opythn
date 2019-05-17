@@ -30,6 +30,7 @@ def foo():
     class Abc():
         y = x
         def bar(self):
+            print(x)
             print(self.y)
     abc = Abc()
     abc.bar()

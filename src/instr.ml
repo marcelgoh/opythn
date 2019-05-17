@@ -88,7 +88,7 @@ let str_of_instr instr =
         (sprintf "<function %s at 0x%x>" b.name (address_of_ptr b.ptr))
     | MAKE_CLASS(s, b) ->
         let str_super opt = match opt with Some id -> id | None -> "" in
-        (sprintf "MAKE_CLASS (%s) <class %s at 0x%x>" (str_super s) b.name (address_of_ptr b.ptr))
+        (sprintf "MAKE_CLASS\t\t(%s) <class %s at 0x%x>" (str_super s) b.name (address_of_ptr b.ptr))
     | _ -> show instr
   in S.global_replace (S.regexp_string "Instr.") "" str
 

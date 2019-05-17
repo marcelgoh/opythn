@@ -42,8 +42,6 @@ let run_tests opy_code =
   printf "************ BYTECODE ************\n";
   let instrs = Bytecode.compile_prog tree in
   Bytecode.print_asm instrs
-(*   printf "************ CONSOLE OUTPUT ************\n"; *)
-(*   Interpreter.interpret instrs @@ Interpreter.init_env () *)
 
 (* normal file input *)
 let from_file opy_code =
@@ -106,7 +104,7 @@ let main () =
     (* start interactive mode *)
     printf "+----------------------------------------------+\n";
     printf "|             OPYTHN INTERACTIVE MODE          |\n";
-    printf "|   Author: Marcel Goh (Release: 30.04.2019)   |\n";
+    printf "|   Author: Marcel Goh (Release: 17.05.2019)   |\n";
     printf "|            Type \"Ctrl-C\" to quit.            |\n";
     printf "+----------------------------------------------+\n";
     flush stdout;
