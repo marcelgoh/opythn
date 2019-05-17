@@ -346,7 +346,7 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
                             let new_scope = H.create 5 in
                             List.iter2 (fun param arg -> H.add new_scope param arg) params args;
                             (* run codeblock with new scope pushed onto locals list *)
-                            run !block { envr with locals = new_scope :: envr.locals }
+                            run !(block.ptr) { envr with locals = new_scope :: envr.locals }
                           )))
         );
       loop !next

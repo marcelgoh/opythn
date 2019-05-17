@@ -34,7 +34,7 @@ let print_asm = Instr.print_instr_array
 (* recursively compile statements *)
 let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
 
-  let is_global = match enclosings with [] -> true | _ -> false in
+  let is_global = enclosings = [] in
 
   (* where nonlocals are stored before they're actually used *)
   let nonlocals = H.create 10 in
@@ -67,16 +67,17 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
     match expr with
       Var s -> (match check_tables_opt s with
                   Some _ -> ()
-                | None -> (match search_upwards 1 enclosings s with
-                             Some n -> H.replace table s (Local n)
-                           | None -> H.replace table s Referred))
+                | None -> H.replace table s Referred)
+(*                     (match search_upwards 1 enclosings s with *)
+(*                              Some n -> H.replace table s (Local n) *)
+(*                            | None -> H.replace table s Referred)) *)
     | Call(f ,es) -> resolve_expr f;
                      List.iter resolve_expr es
     | Op(_, e) -> List.iter resolve_expr e
     | Cond(e1, c, e2) -> resolve_expr e1;
                          resolve_expr c;
                          resolve_expr e2
-    | IntLit _ | FloatLit _ | BoolLit _ | StrLit _ | Lambda(_,_) | None -> ()
+    | IntLit _ | FloatLit _ | BoolLit _ | StrLit _ | Lambda(_, _) | None -> ()
   in
 
   (* iterate through statements and resolve each one *)
@@ -95,6 +96,10 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
            Expr e -> resolve_expr e;
          | Assign(Var s, e) ->
              resolve_expr e;
+             (match H.find_opt table s with
+                Some Referred ->
+                  raise (Bytecode_error (sprintf "Local name `%s` used before assignment" s))
+              | _ -> ());
              add_name s
          | Assign(_, _) ->
              raise (Bytecode_error "Tried to assign to non-assignable expression")
@@ -162,8 +167,11 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
             | None ->
                 (match check_tables_opt id with
                    Some (Local i) -> (LOAD_LOCAL(i + List.length lambdas, id))
-                 | Some Global
-                 | Some Referred  -> (LOAD_GLOBAL id)
+                 | Some Global -> (LOAD_GLOBAL id)
+                 | Some Referred ->
+                     (match search_upwards 1 enclosings id with
+                        Some n -> (LOAD_LOCAL(n, id))
+                      | None -> (LOAD_GLOBAL id))
                  | None -> raise (Bytecode_error (sprintf "Variable `%s`'s scope not resolved: VAR" id))))
          in
          D.add expr_instrs instr
@@ -237,7 +245,8 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
          List.iter (fun s -> H.replace new_table s (Local 0)) args;
          let code_block = compile_expr (args :: lambdas) b in
          D.add code_block RETURN_VALUE;
-         D.add expr_instrs (MAKE_FUNCTION(args, ref code_block))
+         D.add expr_instrs (MAKE_FUNCTION(args, { name = "<lambda>";
+                                                  ptr = ref code_block }))
      | None -> D.add expr_instrs (LOAD_CONST None)
     );
     expr_instrs
@@ -295,7 +304,8 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
          let new_table = H.create 10 in
          List.iter (fun s -> H.replace new_table s (Local 0)) args;
          let code_block : code = compile_stmts body (table::enclosings) new_table in
-         D.add instrs (MAKE_FUNCTION (args, ref code_block));
+         D.add instrs (MAKE_FUNCTION (args, { name = name;
+                                              ptr = ref code_block }));
          compile_id name
      | Return e ->
          compile_and_add_expr e;

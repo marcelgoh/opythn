@@ -93,7 +93,7 @@
 %type <Ast.stmt> global_stmt
 %type <Ast.stmt> nonlocal_stmt
 %type <Ast.stmt> classdef
-%type <string list> class_params
+%type <string option> class_params
 
 %% (* list of production rules *)
 
@@ -215,7 +215,7 @@ expr:
   } %prec LAMBDA
 (* attribute reference *)
 attributeref:
-  e1 = expr; DOT; e2 = expr { AttrRef(e1, e2) }
+  e1 = expr; DOT; a = ID { AttrRef(e1, a) }
 aug_assign:
   v = ID; BW_OR_A; e = expr { Assign(Var v, Op(BwOr, [Var v; e])) }
 | v = ID; BW_XOR_A; e = expr { Assign(Var v, Op(BwXor, [Var v; e])) }
@@ -264,14 +264,9 @@ nonlocal_stmt:
   NONLOCAL; i = ID { Nonlocal i }
 (* class declarations and statements *)
 classdef:
-  CLASS; name = ID; args = class_params?; COLON; body = suite {
-    match args with
-      None   -> Classdef(name, [], body)
-    | Some a -> Classdef(name, a, body)
+  CLASS; name = ID; args = class_params; COLON; body = suite {
+    Classdef(name, args, body)
   }
 class_params:
-  LPAREN; args = param_id_list?; RPAREN {
-    match args with
-      Some a -> a
-    | None   -> []
-  }
+  LPAREN; super = ID; RPAREN { Some super }
+| LPAREN; RPAREN { None }

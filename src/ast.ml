@@ -20,7 +20,7 @@ type expr =
 | Op of op * expr list
 | Cond of expr * expr * expr (* ternary expression *)
 | Lambda of string list * expr    (* anonymous function *)
-| AttrRef of expr * expr
+| AttrRef of expr * string
 | None
 [@@deriving show]
 
@@ -33,7 +33,7 @@ type stmt =
 | Global of string     (* one declaration at a time *)
 | Nonlocal of string
 | Return of expr       (* return only one expression *)
-| Classdef of string * string list * stmt list
+| Classdef of string * string option * stmt list
 | Pass
 | Break
 | Continue

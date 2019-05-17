@@ -14,7 +14,7 @@ def foo():
         print(z + y + x)
 
         def baz():
-            nonlocal y
+            print(y)
             y = 3 + y
             print(y + x)
 
@@ -22,6 +22,14 @@ def foo():
     bar()
 
 foo()
+
+def abc(n):
+    def xyz():
+        print(n + x)
+
+    xyz()
+
+abc(20)
 
 print((lambda x, y: x * 7 - y)(12, 2))
 

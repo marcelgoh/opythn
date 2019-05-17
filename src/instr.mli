@@ -1,9 +1,11 @@
 (* Interface for instructions *)
 
 (* pointer to block of code *)
-type 'a block_ptr =
-  'a DynArray.t ref
-[@opaque]
+type 'a block = {
+  name : string;
+  ptr : 'a DynArray.t ref;
+  [@opaque]
+}
 [@@deriving show]
 
 (* type for single bytecode instruction *)
@@ -24,18 +26,25 @@ type t =
 | COMPARE_IS_NOT
 (* return TOS to caller *)
 | RETURN_VALUE
-(* operations with arguments *)
-| STORE_LOCAL of (* depth : *) int * (* name : *) string (* name = TOS *)
+(* name = TOS *)
+| STORE_LOCAL of (* depth : *) int * (* name : *) string
 | STORE_GLOBAL of (* name : *) string
-| LOAD_CONST of (* value : *) Py_val.t                   (* TOS = value *)
-| LOAD_LOCAL of (* depth : *) int * (* name : *) string  (* TOS = name *)
+| STORE_NAME of (* name : *) string
+| STORE_ATTR of (* name : *) string
+(* TOS = value *)
+| LOAD_CONST of (* value : *) Py_val.t
+(* TOS = name *)
+| LOAD_LOCAL of (* depth : *) int * (* name : *) string
 | LOAD_GLOBAL of (* name : *) string
+| LOAD_NAME of (* name : *) string
+| LOAD_ATTR of (* name : *) string
+(* other operations *)
 | JUMP of (* target : *) int
 | POP_JUMP_IF_FALSE of (* target : *) int
 | JUMP_IF_TRUE_OR_POP of (* target : *) int
 | JUMP_IF_FALSE_OR_POP of (* target : *) int
 | CALL_FUNCTION of (* argc : *) int
-| MAKE_FUNCTION of (* args : *) string list * (* block : *) t block_ptr
+| MAKE_FUNCTION of (* args : *) string list * (* block : *) t block
 [@@deriving show]
 
 (* prints an array of instructions in readable format *)
