@@ -264,9 +264,11 @@ nonlocal_stmt:
   NONLOCAL; i = ID { Nonlocal i }
 (* class declarations and statements *)
 classdef:
-  CLASS; name = ID; args = class_params; COLON; body = suite {
-    Classdef(name, args, body)
+  CLASS; name = ID; args = class_params?; COLON; body = suite {
+    match args with
+      Some thing -> Classdef(name, thing, body)
+    | None -> Classdef(name, None, body)
   }
 class_params:
-  LPAREN; super = ID; RPAREN { Some super }
-| LPAREN; RPAREN { None }
+  LPAREN; RPAREN { None }
+| LPAREN; super = ID; RPAREN { Some super }

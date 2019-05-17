@@ -32,7 +32,7 @@ let print_entry str depth =
 let print_asm = Instr.print_instr_array
 
 (* recursively compile statements *)
-let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
+let rec compile_stmts in_class stmts enclosings table =
 
   let is_global = enclosings = [] in
 
@@ -77,6 +77,7 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
     | Cond(e1, c, e2) -> resolve_expr e1;
                          resolve_expr c;
                          resolve_expr e2
+    | AttrRef(obj, _) -> resolve_expr obj
     | IntLit _ | FloatLit _ | BoolLit _ | StrLit _ | Lambda(_, _) | None -> ()
   in
 
@@ -101,6 +102,10 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
                   raise (Bytecode_error (sprintf "Local name `%s` used before assignment" s))
               | _ -> ());
              add_name s
+         | Assign(AttrRef(obj, _), e) ->
+             resolve_expr e;
+             (* we don't resolve the identifier *)
+             resolve_expr obj
          | Assign(_, _) ->
              raise (Bytecode_error "Tried to assign to non-assignable expression")
          | If(c, s1, s2) ->
@@ -134,10 +139,12 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
                      | None ->
                          raise (Bytecode_error (sprintf "No binding for %s found" s))))
          | Return e -> resolve_expr e
-         (* we don't resolve inside function declarations *)
+         (* we don't resolve inside function or class declarations *)
          | Funcdef(name, _, _) ->
              add_name name
-         | Break | Continue -> ());
+         | Classdef(name, _, _) ->
+             add_name name
+         | Break | Continue | Pass -> ());
         resolve_stmts ss
   in
 
@@ -161,20 +168,23 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
     (* pattern match expression and compile accordingly *)
     (match e with
        Var id ->
-         let instr : Instr.t =
-           (match search_lambdas 0 lambdas id with
-              Some n -> (LOAD_LOCAL(n, id))
-            | None ->
-                (match check_tables_opt id with
-                   Some (Local i) -> (LOAD_LOCAL(i + List.length lambdas, id))
-                 | Some Global -> (LOAD_GLOBAL id)
-                 | Some Referred ->
-                     (match search_upwards 1 enclosings id with
-                        Some n -> (LOAD_LOCAL(n, id))
-                      | None -> (LOAD_GLOBAL id))
-                 | None -> raise (Bytecode_error (sprintf "Variable `%s`'s scope not resolved: VAR" id))))
-         in
-         D.add expr_instrs instr
+         if in_class then
+           D.add expr_instrs (LOAD_NAME id)
+         else
+           let instr : Instr.t =
+             (match search_lambdas 0 lambdas id with
+                Some n -> (LOAD_LOCAL(n, id))
+              | None ->
+                  (match check_tables_opt id with
+                     Some (Local i) -> (LOAD_LOCAL(i + List.length lambdas, id))
+                   | Some Global -> (LOAD_GLOBAL id)
+                   | Some Referred ->
+                       (match search_upwards 1 enclosings id with
+                          Some n -> (LOAD_LOCAL(n, id))
+                        | None -> (LOAD_GLOBAL id))
+                   | None -> raise (Bytecode_error (sprintf "Variable `%s`'s scope not resolved: VAR" id))))
+           in
+           D.add expr_instrs instr
      | IntLit i -> D.add expr_instrs (LOAD_CONST (Int i))
      | FloatLit f -> D.add expr_instrs (LOAD_CONST (Float f))
      | BoolLit b -> D.add expr_instrs (LOAD_CONST (Bool b))
@@ -247,6 +257,9 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
          D.add code_block RETURN_VALUE;
          D.add expr_instrs (MAKE_FUNCTION(args, { name = "<lambda>";
                                                   ptr = ref code_block }))
+     | AttrRef(e, id) ->
+         compile_and_add_expr e;
+         D.add instrs (LOAD_ATTR id)
      | None -> D.add expr_instrs (LOAD_CONST None)
     );
     expr_instrs
@@ -256,18 +269,25 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
   let rec compile_stmt (in_loop : bool) (s : Ast.stmt) : unit =
     let compile_and_add_expr expr = D.append (compile_expr [] expr) instrs in
     let compile_id id =
-      let instr : Instr.t =
-        (match check_tables_opt id with
-           Some (Local n) -> (STORE_LOCAL(n, id))
-         | Some Global
-         | Some Referred  -> (STORE_GLOBAL id)
-         | None -> raise (Bytecode_error (sprintf "Variable `%s`'s scope not resolved: COMPILE_ID" id)))
-      in
-      D.add instrs instr
+      if in_class then
+        D.add instrs (STORE_NAME id)
+      else
+        let instr : Instr.t =
+          (match check_tables_opt id with
+             Some (Local n) -> (STORE_LOCAL(n, id))
+           | Some Global
+           | Some Referred  -> (STORE_GLOBAL id)
+           | None -> raise (Bytecode_error (sprintf "Variable `%s`'s scope not resolved: COMPILE_ID" id)))
+        in
+        D.add instrs instr
     in
     (match s with
        Expr e -> compile_and_add_expr e;
      | Assign (Var id, e) -> compile_and_add_expr e; compile_id id
+     | Assign (AttrRef(obj, id), e) ->
+         compile_and_add_expr e;
+         compile_and_add_expr obj;
+         D.add instrs (STORE_ATTR id)
      | Assign(_, _) ->
          raise (Bytecode_error "Tried to assign to non-assignable expression")
      | If (c, s1, s2) ->
@@ -303,7 +323,7 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
      | Funcdef (name, args, body) ->
          let new_table = H.create 10 in
          List.iter (fun s -> H.replace new_table s (Local 0)) args;
-         let code_block : code = compile_stmts body (table::enclosings) new_table in
+         let code_block : code = compile_stmts false body (table::enclosings) new_table in
          D.add instrs (MAKE_FUNCTION (args, { name = name;
                                               ptr = ref code_block }));
          compile_id name
@@ -320,7 +340,12 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
            raise (Bytecode_error "CONTINUE statement found outside loop.")
          else
            D.add instrs (JUMP (-20)) (* -20 indicates continue *)
-     | Global _ | Nonlocal _ -> ()
+     | Classdef (name, super, body) ->
+         let code_block = compile_stmts true body enclosings table in
+         D.add instrs (MAKE_CLASS (super, { name = name;
+                                            ptr = ref code_block }));
+         compile_id name
+     | Global _ | Nonlocal _ | Pass -> ()
     )
   in
 
@@ -339,4 +364,4 @@ let rec compile_stmts stmts (enclosings : sym_table list) (table : sym_table) =
   instrs
 
 (* interface to the rest of the system *)
-let compile_prog (p : Ast.program) : code = compile_stmts p [] (H.create 10)
+let compile_prog (p : Ast.program) : code = compile_stmts false p [] (H.create 10)

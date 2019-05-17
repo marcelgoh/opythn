@@ -14,7 +14,7 @@ def foo():
         print(z + y + x)
 
         def baz():
-            print(y)
+            nonlocal y
             y = 3 + y
             print(y + x)
 
