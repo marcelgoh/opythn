@@ -57,7 +57,7 @@ let parse buffer = try Parser.input Lexer.read buffer with
 let from_file opy_code =
   let buffer = ref (Lexing.from_string opy_code) in
   if !debug then (
-    printf "************ LEXER OUTPUT ************\n";
+    printf "************* LEXER OUTPUT *************\n";
     Lexer.setup_file_input !buffer;
     print_lex !buffer;
     buffer := Lexing.from_string opy_code (* reset buffer *)
@@ -66,9 +66,9 @@ let from_file opy_code =
   let tree = parse !buffer in
   let instrs = Bytecode.compile_prog tree in
   if !debug then (
-    printf "************ PARSER OUTPUT ************\n";
+    printf "************ PARSER OUTPUT *************\n";
     printf "%s\n" (Ast.show tree);
-    printf "************ BYTECODE ************\n";
+    printf "*************** BYTECODE ***************\n";
     Bytecode.print_asm instrs;
     printf "************ CONSOLE OUTPUT ************\n"
   );
@@ -89,9 +89,9 @@ let rec repl () =
     let tree = parse buffer in
     let instrs = Bytecode.compile_prog tree in
     if !debug then (
-      printf "************ PARSER OUTPUT ************\n";
+      printf "************ PARSER OUTPUT *************\n";
       printf "%s\n" (Ast.show tree);
-      printf "************ BYTECODE ************\n";
+      printf "*************** BYTECODE ***************\n";
       Bytecode.print_asm instrs;
       printf "************ CONSOLE OUTPUT ************\n"
     );
@@ -112,7 +112,7 @@ let rec lex_only () =
   flush stdout;
   let buffer = Lexing.from_channel stdin in
   Lexer.setup_repl_input buffer;
-  printf "************ LEXER OUTPUT ************\n";
+  printf "************* LEXER OUTPUT *************\n";
   print_lex buffer;
   lex_only ()
 
@@ -181,9 +181,9 @@ let rec ctrlc () =
 
 let print_splash () =
   printf "+----------------------------------------------+\n";
-  printf "|             OPYTHN INTERACTIVE MODE          |\n";
+  printf "|            OPYTHN INTERACTIVE MODE           |\n";
   printf "|   Author: Marcel Goh (Release: 18.05.2019)   |\n";
-  printf "|            Type \"Ctrl-C\" to quit.            |\n";
+  printf "|          Type \"Ctrl-C\" for options.          |\n";
   printf "+----------------------------------------------+\n"
 
 (* program entry point *)
