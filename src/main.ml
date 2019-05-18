@@ -98,10 +98,13 @@ let rec repl () =
     (* interpret instructions and update global environment pointer *)
     envr := Interpreter.interpret instrs !envr;
     repl ()
-  with e ->
-    let msg = Printexc.to_string e in
-    printf "Error: %s\n" msg;
-    repl ()
+  with
+    Sys.Break ->
+      raise Sys.Break
+  | e ->
+      let msg = Printexc.to_string e in
+      printf "Error: %s\n" msg;
+      repl ()
 
 (* currently prints lex output only *)
 let rec lex_only () =
@@ -123,12 +126,6 @@ let handle_file filename =
 
 let handle_interactive () =
   (* start interactive mode *)
-  printf "+----------------------------------------------+\n";
-  printf "|             OPYTHN INTERACTIVE MODE          |\n";
-  printf "|   Author: Marcel Goh (Release: 18.05.2019)   |\n";
-  printf "|            Type \"Ctrl-C\" to quit.            |\n";
-  printf "+----------------------------------------------+\n";
-  flush stdout;
   if !lex then (
     lex_only ()
   )
@@ -139,20 +136,75 @@ let handle_interactive () =
     repl ()
   )
 
+let read_one_char () =
+    let termio = Unix.tcgetattr Unix.stdin in
+    Unix.tcsetattr Unix.stdin Unix.TCSADRAIN { termio with Unix.c_icanon = false };
+    let c = input_char stdin in
+    Unix.tcsetattr Unix.stdin Unix.TCSADRAIN termio;
+    c
+
+(* behaviour on interrupt *)
+let rec ctrlc () =
+  try (
+    printf "\nInterrupted. Enter option (? for help): ";
+    flush stdout;
+    let c = read_one_char () in
+    flush stdout;
+    printf "\n";
+    match c with
+      'd' | 'D' ->
+        debug := not !debug;
+        handle_interactive ()
+    | 'i' | 'I' ->
+        handle_interactive()
+    | 'l' | 'L' ->
+        lex := not !lex;
+        handle_interactive ()
+    | 'q' | 'Q' ->
+        printf "Ich sterbe.\n";
+        exit 0
+    | 'r' | 'R' ->
+        envr := Interpreter.init_env ();
+        handle_interactive ()
+    | '?' ->
+        printf "\nD: Toggle debug mode.\n";
+        printf "I: Ignore interrupt request.\n";
+        printf "L: Toggle lex-only mode.\n";
+        printf "Q: Quit the REPL.\n";
+        printf "R: Reset REPL with empty environment.\n";
+        ctrlc ()
+    | _ ->
+        printf "\nUnknown option.\n";
+        ctrlc ()
+  )
+  with Sys.Break -> ctrlc ()
+
+let print_splash () =
+  printf "+----------------------------------------------+\n";
+  printf "|             OPYTHN INTERACTIVE MODE          |\n";
+  printf "|   Author: Marcel Goh (Release: 18.05.2019)   |\n";
+  printf "|            Type \"Ctrl-C\" to quit.            |\n";
+  printf "+----------------------------------------------+\n"
+
 (* program entry point *)
 let main () =
-  Sys.set_signal Sys.sigint (Sys.Signal_handle quit);
-  Arg.parse (Arg.align speclist) set_filename usage_msg;
-  if !lex || !load <> "" then (
-    handle_interactive ()
+  try (
+    Sys.catch_break true;
+    Arg.parse (Arg.align speclist) set_filename usage_msg;
+    if !lex || !load <> "" then (
+      print_splash ();
+      handle_interactive ()
+    )
+    else (
+      match !filename with
+        None ->
+          print_splash ();
+          handle_interactive ()
+      | Some fname ->
+          handle_file fname;
+          exit 0
+    )
   )
-  else (
-    match !filename with
-      None ->
-        handle_interactive ()
-    | Some fname ->
-        handle_file fname;
-        exit 0
-  )
+  with Sys.Break -> ctrlc ()
 
 let () = main ()
