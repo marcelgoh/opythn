@@ -4,10 +4,35 @@ open Printf
 
 exception File_error of string
 
+(* command-line flags *)
+let debug = ref false         (* print intermediary outputs *)
+let lex = ref false           (* lex-only mode *)
+let load = ref ""             (* load code into REPL from files *)
+let filename = ref None       (* filename *)
+
+let set_file_to_load str = load := str
+let do_nothing () = ()
+(* only the first anonymous argument is saved as filename *)
+let set_filename str =
+  match !filename with
+    None -> filename := Some str
+  | Some _ -> ()
+
+let usage_msg = "Available options:"
+
+let speclist = [
+  ("-debug", Arg.Set debug, "\tEnables printing of all intermediary representations");
+  ("-lex", Arg.Set lex, "\tStarts REPL in lex-only mode");
+  ("-load", Arg.String set_file_to_load, "\tStarts REPL with a file loaded");
+]
+
+(* pointer to global environment *)
+let envr = ref (Interpreter.init_env ())
+
 (* opens the specified file and outputs its contents as a string *)
-let str_from_filename filename =
+let str_from_filename fname =
   try
-    let ch = open_in filename in
+    let ch = open_in fname in
     let size = in_channel_length ch in
     let str = really_input_string ch size in
     close_in ch;
@@ -28,28 +53,26 @@ let parse buffer = try Parser.input Lexer.read buffer with
                      Parser.Error ->
                        printf "%s: Syntax error.\n" (Lexer.print_position buffer); []
 
-(* run tests *)
-let run_tests opy_code =
+(* file input *)
+let from_file opy_code =
   let buffer = ref (Lexing.from_string opy_code) in
-  printf "************ LEXER OUTPUT ************\n";
-  Lexer.setup_file_input !buffer;
-  print_lex !buffer;
-  printf "************ PARSER OUTPUT ************\n";
-  buffer := Lexing.from_string opy_code; (* reset buffer *)
+  if !debug then (
+    printf "************ LEXER OUTPUT ************\n";
+    Lexer.setup_file_input !buffer;
+    print_lex !buffer;
+    buffer := Lexing.from_string opy_code (* reset buffer *)
+  );
   Lexer.setup_file_input !buffer;
   let tree = parse !buffer in
-  printf "%s\n" (Ast.show tree);
-  printf "************ BYTECODE ************\n";
   let instrs = Bytecode.compile_prog tree in
-  Bytecode.print_asm instrs
-
-(* normal file input *)
-let from_file opy_code =
-  let buffer = Lexing.from_string opy_code in
-  Lexer.setup_file_input buffer;
-  let tree = parse buffer in
-  let instrs = Bytecode.compile_prog tree in
-  Interpreter.interpret instrs @@ Interpreter.init_env ()
+  if !debug then (
+    printf "************ PARSER OUTPUT ************\n";
+    printf "%s\n" (Ast.show tree);
+    printf "************ BYTECODE ************\n";
+    Bytecode.print_asm instrs;
+    printf "************ CONSOLE OUTPUT ************\n"
+  );
+  envr := Interpreter.interpret instrs !envr
 
 (* quit repl *)
 let quit _ =
@@ -57,73 +80,79 @@ let quit _ =
   exit 0
 
 (* read-eval-print loop *)
-let rec repl envr =
+let rec repl () =
   try
     printf "]=> ";
     flush stdout;
     let buffer = Lexing.from_channel stdin in
     Lexer.setup_repl_input buffer;
     let tree = parse buffer in
-    printf "************ PARSER OUTPUT ************\n";
-    printf "%s\n" (Ast.show tree);
-    printf "************ BYTECODE ************\n";
     let instrs = Bytecode.compile_prog tree in
-    Bytecode.print_asm instrs;
-    printf "************ CONSOLE OUTPUT ************\n";
-    Interpreter.interpret instrs envr;
-    repl envr
+    if !debug then (
+      printf "************ PARSER OUTPUT ************\n";
+      printf "%s\n" (Ast.show tree);
+      printf "************ BYTECODE ************\n";
+      Bytecode.print_asm instrs;
+      printf "************ CONSOLE OUTPUT ************\n"
+    );
+    (* interpret instructions and update global environment pointer *)
+    envr := Interpreter.interpret instrs !envr;
+    repl ()
   with e ->
     let msg = Printexc.to_string e in
     printf "Error: %s\n" msg;
-    repl envr
+    repl ()
 
 (* currently prints lex output only *)
-let rec debug () =
-  printf "DEBUG]=> ";
+let rec lex_only () =
+  printf "LEX-ONLY]=> ";
   flush stdout;
   let buffer = Lexing.from_channel stdin in
   Lexer.setup_repl_input buffer;
   printf "************ LEXER OUTPUT ************\n";
   print_lex buffer;
-  debug ()
+  lex_only ()
 
-let handle_file (debug : bool) filename =
-  let proc = if debug then run_tests else from_file in
+let handle_file filename =
   if Filename.extension filename <> ".opy" then
     raise (File_error "File extension not supported.")
   else
     match str_from_filename filename with
-      Some s -> proc s
+      Some s -> from_file s
     | None   -> printf "Failed to read from file.\n"
 
-(* select mode based on program arguments *)
+let handle_interactive () =
+  (* start interactive mode *)
+  printf "+----------------------------------------------+\n";
+  printf "|             OPYTHN INTERACTIVE MODE          |\n";
+  printf "|   Author: Marcel Goh (Release: 18.05.2019)   |\n";
+  printf "|            Type \"Ctrl-C\" to quit.            |\n";
+  printf "+----------------------------------------------+\n";
+  flush stdout;
+  if !lex then (
+    lex_only ()
+  )
+  else (
+    if !load <> "" then (
+      handle_file !load
+    );
+    repl ()
+  )
+
+(* program entry point *)
 let main () =
   Sys.set_signal Sys.sigint (Sys.Signal_handle quit);
-  let argc = Array.length Sys.argv in
-  if argc < 2 then (
-    (* start interactive mode *)
-    printf "+----------------------------------------------+\n";
-    printf "|             OPYTHN INTERACTIVE MODE          |\n";
-    printf "|   Author: Marcel Goh (Release: 17.05.2019)   |\n";
-    printf "|            Type \"Ctrl-C\" to quit.            |\n";
-    printf "+----------------------------------------------+\n";
-    flush stdout;
-    let envr = Interpreter.init_env () in
-    repl envr
+  Arg.parse (Arg.align speclist) set_filename usage_msg;
+  if !lex || !load <> "" then (
+    handle_interactive ()
   )
-  else
-    if Sys.argv.(1) = "-debug" then (
-      if argc > 2 then
-        (* run file with all outputs *)
-        handle_file true Sys.argv.(2)
-      else (
-        printf "Entering debug mode.\n";
-        (* start debug REPL *)
-        debug()
-      )
-    )
-    else
-      (* run file normally *)
-      handle_file false Sys.argv.(1)
+  else (
+    match !filename with
+      None ->
+        handle_interactive ()
+    | Some fname ->
+        handle_file fname;
+        exit 0
+  )
 
 let () = main ()

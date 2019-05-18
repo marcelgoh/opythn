@@ -360,13 +360,14 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
 let interpret c envr =
   let ret_val : Py_val.t = run c envr in
   match ret_val with
-    None -> ()
+    None -> envr
   | _ ->
     (* try to print top of stack *)
     let pv = lookup_global envr "print" in
     (match pv with
-       Fun f -> f [ret_val] |> ignore
-     | _     -> ())
+       Fun f -> f [ret_val] |> ignore;
+                envr
+     | _     -> envr)
 
 (* create a new environment and fill it with built-ins *)
 let init_env () : env =
