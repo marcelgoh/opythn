@@ -49,7 +49,7 @@ type t =
 | JUMP_IF_FALSE_OR_POP of (* target : *) int
 | CALL_FUNCTION of (* argc : *) int
 | MAKE_FUNCTION of (* args : *) string list * (* block : *) t block
-| MAKE_CLASS of (* super : *) string option * (* block : *) t block
+| MAKE_CLASS of (* number of superclasses : *) int * (* block : *) t block
 [@@deriving show]
 
 let address_of_ptr ptr = 2*(Obj.magic ptr)
@@ -86,9 +86,8 @@ let str_of_instr instr =
     | MAKE_FUNCTION(a, b) ->
         (sprintf "MAKE_FUNCTION\t\t%s " (pretty_list a)) ^
         (sprintf "<function %s at 0x%x>" b.name (address_of_ptr b.ptr))
-    | MAKE_CLASS(s, b) ->
-        let str_super opt = match opt with Some id -> id | None -> "" in
-        (sprintf "MAKE_CLASS\t\t(%s) <class %s at 0x%x>" (str_super s) b.name (address_of_ptr b.ptr))
+    | MAKE_CLASS(i, b) ->
+        (sprintf "MAKE_CLASS\t\t%d <class %s at 0x%x>" i b.name (address_of_ptr b.ptr))
     | _ -> show instr
   in S.global_replace (S.regexp_string "Instr.") "" str
 

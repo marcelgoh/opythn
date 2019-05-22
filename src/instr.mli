@@ -45,7 +45,7 @@ type t =
 | JUMP_IF_FALSE_OR_POP of (* target : *) int
 | CALL_FUNCTION of (* argc : *) int
 | MAKE_FUNCTION of (* args : *) string list * (* block : *) t block
-| MAKE_CLASS of (* super : *) string option * (* block : *) t block
+| MAKE_CLASS of (* number of superclasses : *) int * (* block : *) t block
 [@@deriving show]
 
 (* prints an array of instructions in readable format *)

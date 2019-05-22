@@ -39,6 +39,9 @@ let rec compile_stmts in_class stmts enclosings table =
   (* where nonlocals are stored before they're actually used *)
   let nonlocals = H.create 10 in
 
+  (* for variables directly in class definitions *)
+  let class_vars = H.create 10 in
+
   (* check both non-local and local tables *)
   let check_tables_opt str =
     match H.find_opt table str with
@@ -84,11 +87,14 @@ let rec compile_stmts in_class stmts enclosings table =
   (* iterate through statements and resolve each one *)
   let rec resolve_stmts (stmts : Ast.stmt list) =
     let add_name name =
-      let depth_to_add = if is_global then Global else (Local 0) in
-        match check_tables_opt name with
-          (* the only time a nonlocal shifts over to local table *)
-          Some d -> H.replace table name d
-        | None -> H.replace table name depth_to_add
+      if in_class then
+        H.replace class_vars name (Local 0)
+      else
+        let depth_to_add = if is_global then Global else (Local 0) in
+          match check_tables_opt name with
+            (* the only time a nonlocal shifts over to local table *)
+            Some d -> H.replace table name d
+          | None -> H.replace table name depth_to_add
     in
     match stmts with
       [] -> ()
@@ -118,26 +124,38 @@ let rec compile_stmts in_class stmts enclosings table =
              resolve_expr c;
              resolve_stmts s
          | Global s ->
-             (match check_tables_opt s with
-                None   -> H.replace table s Global
-              | Some _ ->
-                  if is_global then ()
-                  else
-                    raise
-                    (Bytecode_error (sprintf "Name `%s` used before global declaration" s)))
+             if in_class then
+               H.replace class_vars s Global
+             else
+               (match check_tables_opt s with
+                  None   -> H.replace table s Global
+                | Some _ ->
+                    if is_global then ()
+                    else
+                      raise
+                      (Bytecode_error (sprintf "Name `%s` used before global declaration" s)))
          | Nonlocal s ->
              if is_global then
                raise (Bytecode_error "Nonlocal declared in global scope")
              else
-               (match H.find_opt table s with
-                  Some _ ->
-                    raise
-                      (Bytecode_error (sprintf "Name `%s` used before nonlocal declaration" s))
-                | None ->
-                    (match search_upwards 1 enclosings s with
-                       Some num -> H.replace nonlocals s (Local num)
-                     | None ->
-                         raise (Bytecode_error (sprintf "No binding for %s found" s))))
+               if in_class then
+                 (match H.find_opt table s with
+                    Some _ -> H.replace nonlocals s (Local 0)
+                  | None ->
+                      (match search_upwards 1 enclosings s with
+                         Some num -> H.replace nonlocals s (Local num)
+                       | None ->
+                           raise (Bytecode_error (sprintf "No binding for %s found" s))))
+               else
+                 (match H.find_opt table s with
+                    Some _ ->
+                      raise
+                        (Bytecode_error (sprintf "Name `%s` used before nonlocal declaration" s))
+                  | None ->
+                      (match search_upwards 1 enclosings s with
+                         Some num -> H.replace nonlocals s (Local num)
+                       | None ->
+                           raise (Bytecode_error (sprintf "No binding for %s found" s))))
          | Return e -> resolve_expr e
          (* we don't resolve inside function or class declarations *)
          | Funcdef(name, _, _) ->
@@ -151,39 +169,60 @@ let rec compile_stmts in_class stmts enclosings table =
   (* the two functions below modify this instruction array *)
   let instrs : Instr.t D.t = D.create () in
 
+  (* helper function: search list of list of lambda arguments
+   * calling sequence should set count to 0
+   *)
+  let rec search_lambdas count lambdas id =
+    match lambdas with
+      []    -> None
+    | l::ls -> if List.mem id l then Some count
+               else search_lambdas (count + 1) ls id
+  in
+  (* helper function to get load instruction from identifier *)
+  let get_load_instr lambdas id : Instr.t =
+    let search : Instr.t =
+      (match search_lambdas 0 lambdas id with
+        Some n -> (LOAD_LOCAL(n, id))
+      | None ->
+          (match check_tables_opt id with
+             Some (Local i) -> (LOAD_LOCAL(i + List.length lambdas, id))
+           | Some Global -> (LOAD_GLOBAL id)
+           | Some Referred ->
+               (match search_upwards 1 enclosings id with
+                  Some n -> (LOAD_LOCAL(n, id))
+                | None -> (LOAD_GLOBAL id))
+           | None ->
+               raise (Bytecode_error (sprintf "Variable `%s`'s scope not resolved: COMPILE_EXPR" id))))
+    in
+    if in_class then
+      (match H.find_opt class_vars id with
+         Some d ->
+           (match d with
+              Global _ -> (LOAD_GLOBAL id)  (* explicit global *)
+            | Referred | Local _ -> LOAD_NAME id)
+       | None ->
+           let instr = search in
+           (match instr with
+              LOAD_LOCAL (i, _) ->
+                LOAD_LOCAL (i, id)
+            | LOAD_GLOBAL _ ->
+                LOAD_NAME id
+            | _ ->
+                raise (Bytecode_error
+                         (sprintf "Failed to get load instruction for `%s`: VAR" id))))
+    else
+      search
+  in
+
   (* convert an expression to bytecode and add instructions to array *)
   let rec compile_expr (lambdas : string list list) (e : Ast.expr) : code =
     (* local instruction array for compiling expressions *)
     let expr_instrs = D.create () in
     let compile_and_add_expr expr = D.append (compile_expr lambdas expr) expr_instrs in
-    (* search list of list of lambda arguments
-     * calling sequence should set count to 0
-     *)
-    let rec search_lambdas count lambdas id =
-      match lambdas with
-        []    -> None
-      | l::ls -> if List.mem id l then Some count
-                 else search_lambdas (count + 1) ls id
-    in
     (* pattern match expression and compile accordingly *)
     (match e with
        Var id ->
-         if in_class then
-           D.add expr_instrs (LOAD_NAME id)
-         else
-           let instr : Instr.t =
-             (match search_lambdas 0 lambdas id with
-                Some n -> (LOAD_LOCAL(n, id))
-              | None ->
-                  (match check_tables_opt id with
-                     Some (Local i) -> (LOAD_LOCAL(i + List.length lambdas, id))
-                   | Some Global -> (LOAD_GLOBAL id)
-                   | Some Referred ->
-                       (match search_upwards 1 enclosings id with
-                          Some n -> (LOAD_LOCAL(n, id))
-                        | None -> (LOAD_GLOBAL id))
-                   | None -> raise (Bytecode_error (sprintf "Variable `%s`'s scope not resolved: VAR" id))))
-           in
+           let instr : Instr.t = get_load_instr lambdas id in
            D.add expr_instrs instr
      | IntLit i -> D.add expr_instrs (LOAD_CONST (Int i))
      | FloatLit f -> D.add expr_instrs (LOAD_CONST (Float f))
@@ -342,8 +381,16 @@ let rec compile_stmts in_class stmts enclosings table =
            D.add instrs (JUMP (-20)) (* -20 indicates continue *)
      | Classdef (name, super, body) ->
          let code_block = compile_stmts true body enclosings table in
-         D.add instrs (MAKE_CLASS (super, { name = name;
-                                            ptr = ref code_block }));
+         (* side effect: pushes superclass onto stack if needed *)
+         let num_supers =
+           match super with
+             Some s -> let instr = get_load_instr [] s in
+                       D.add instrs instr;
+                       1
+           | None -> 0
+         in
+         D.add instrs (MAKE_CLASS (num_supers,
+                                   { name = name; ptr = ref code_block }));
          compile_id name
      | Global _ | Nonlocal _ | Pass -> ()
     )

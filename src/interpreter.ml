@@ -22,7 +22,7 @@ let as_bool = function
 | Bool b -> b
 | Float f -> f <> 0.0
 | Str s -> s <> ""
-| Fun f -> true
+| Fun (_, _) -> true
 | None -> false
 
 let as_int = function
@@ -333,12 +333,12 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
              done;
              let retval =
                match S.pop stack with
-                 Fun f -> f !arglist
+                 Fun (_, f) -> f !arglist
                | _     -> raise (Runtime_error "Tried to apply non-function object: CALL_FUNCTION")
              in
              s_push retval
          | MAKE_FUNCTION (params, block) ->
-             s_push (Fun
+             s_push (Fun (block.name,
                        (fun args ->
                           if List.length params <> List.length args then
                             raise (Runtime_error "Wrong argument count: MAKE_FUNCTION")
@@ -347,7 +347,7 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
                             List.iter2 (fun param arg -> H.add new_scope param arg) params args;
                             (* run codeblock with new scope pushed onto locals list *)
                             run !(block.ptr) { envr with locals = new_scope :: envr.locals }
-                          )))
+                          ))))
         );
       loop !next
     )
@@ -365,9 +365,10 @@ let interpret c envr =
     (* try to print top of stack *)
     let pv = lookup_global envr "print" in
     (match pv with
-       Fun f -> f [ret_val] |> ignore;
-                envr
-     | _     -> envr)
+       Fun (_, f) ->
+         f [ret_val] |> ignore;
+         envr
+     | _ -> envr)
 
 (* create a new environment and fill it with built-ins *)
 let init_env () : env =

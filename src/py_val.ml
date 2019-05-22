@@ -5,7 +5,7 @@ type t =
 | Float of float
 | Bool of bool
 | Str of string
-| Fun of (t list -> t)
+| Fun of string * (t list -> t)  (* functions know their name *)
 | None
 [@@deriving show]
 

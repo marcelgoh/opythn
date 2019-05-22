@@ -17,15 +17,21 @@ let print args =
         printf " "
       else ();
       (match pv with
-         Int i   -> printf "%d" i
-       | Float f -> let raw = sprintf "%.15g" f in
-                    let str = if String.contains raw '.' then raw
-                              else raw ^ ".0" in
+         Int i ->
+           printf "%d" i
+       | Float f ->
+           let raw = sprintf "%.15g" f in
+           let str = if String.contains raw '.' then raw else raw ^ ".0" in
            printf "%s" (Str.global_replace (Str.regexp "\\([^.]\\)0*$") "\\1" str)
-       | Bool b  -> if b then printf "True" else printf "False"
-       | Str s   -> printf "%s" s
-       | Fun f   -> printf "<function>"
-       | None    -> printf "None");
+       | Bool b ->
+           if b then printf "True" else printf "False"
+       | Str s ->
+           printf "%s" s
+       | Fun(name, _) ->
+           printf "<function %s>" name
+       | None ->
+           printf "None"
+      );
       print' true pvs in
   print' false args
 
@@ -78,7 +84,7 @@ let bool_cast args =
       | Bool b -> Bool b
       | Float f -> Bool (f <> 0.0)
       | Str s -> Bool (s <> "")
-      | Fun f -> Bool true
+      | Fun(_, _) -> Bool true
       | None -> Bool false
 
 (* chr() -- only supports ASCII, doesn't match Python 3 exactly *)
@@ -200,17 +206,17 @@ let round args =
 (* built-in scope *)
 let table : (string, Py_val.t) Hashtbl.t =
   let s = H.create 33 in
-  H.add s "abs" (Fun abs);
-  H.add s "bin" (Fun bin);
-  H.add s "bool" (Fun bool_cast);
-  H.add s "chr" (Fun chr_ascii);
-  H.add s "float" (Fun float_cast);
-  H.add s "hex" (Fun (hex_oct true));
-  H.add s "input" (Fun input);
-  H.add s "int" (Fun int_cast);
-  H.add s "oct" (Fun (hex_oct false));
-  H.add s "ord" (Fun ord);
-  H.add s "print" (Fun print_ln);
-  H.add s "round" (Fun round);
+  H.add s "abs" (Fun ("abs", abs));
+  H.add s "bin" (Fun ("bin", bin));
+  H.add s "bool" (Fun ("bool", bool_cast));
+  H.add s "chr" (Fun ("chr", chr_ascii));
+  H.add s "float" (Fun ("float", float_cast));
+  H.add s "hex" (Fun ("hex", (hex_oct true)));
+  H.add s "input" (Fun ("input", input));
+  H.add s "int" (Fun ("int", int_cast));
+  H.add s "oct" (Fun ("oct", (hex_oct false)));
+  H.add s "ord" (Fun ("ord", ord));
+  H.add s "print" (Fun ("print", print_ln));
+  H.add s "round" (Fun ("round", round));
   s
 
