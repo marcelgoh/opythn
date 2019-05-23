@@ -11,7 +11,9 @@ exception Runtime_error of string
 exception Type_error
 
 type scope = (string, Py_val.t) H.t
+
 type env = {
+  cls : Py_val.cls option;
   locals : scope list;
   globals : scope list;
 }
@@ -375,7 +377,8 @@ let init_env () : env =
   (* initialise scopes -- two for now *)
   let (built_in_s : scope) = Built_in.table in
   let (global_s : scope) = H.create 5 in
-  { locals = [];
+  { cls = None;
+    locals = [];
     globals = [global_s; built_in_s];
   }
 

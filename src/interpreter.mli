@@ -2,6 +2,7 @@
 
 type scope = (string, Py_val.t) Hashtbl.t
 type env = {
+  cls : Py_val.cls option;
   locals : scope list;
   globals : scope list;
 }
