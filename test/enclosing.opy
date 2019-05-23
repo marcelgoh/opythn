@@ -16,6 +16,7 @@ def foo(y):
     d = m   # not defined in any scope    GLOBAL  **
     e = n   # explicitly nonlocal         LOCAL(1)
     f = p   # explicitly global           GLOBAL
+    print(a, b, c, d, e, f)
 
   class Baz:
     x = 1
@@ -30,5 +31,6 @@ def foo(y):
     f = p   # explicitly global           GLOBAL
 
   print(Baz().b)
+  print(Baz.a, Baz.b, Baz.c, Baz.d, Baz.e, Baz.f)
 
   y = 7

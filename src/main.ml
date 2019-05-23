@@ -182,23 +182,24 @@ let rec ctrlc () =
 let print_splash () =
   printf "+----------------------------------------------+\n";
   printf "|            OPYTHN INTERACTIVE MODE           |\n";
-  printf "|   Author: Marcel Goh (Release: 18.05.2019)   |\n";
+  printf "|   Author: Marcel Goh (Release: 23.05.2019)   |\n";
   printf "|          Type \"Ctrl-C\" for options.          |\n";
   printf "+----------------------------------------------+\n"
 
 (* program entry point *)
 let main () =
   try (
-    Sys.catch_break true;
     Arg.parse (Arg.align speclist) set_filename usage_msg;
     if !lex || !load <> "" then (
       print_splash ();
+      Sys.catch_break true;
       handle_interactive ()
     )
     else (
       match !filename with
         None ->
           print_splash ();
+          Sys.catch_break true;
           handle_interactive ()
       | Some fname ->
           handle_file fname;

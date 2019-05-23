@@ -52,6 +52,8 @@ type t =
 | CALL_FUNCTION of (* argc : *) int
 | MAKE_FUNCTION of (* args : *) string list * (* block : *) t block
 | MAKE_CLASS of (* number of superclasses : *) int * (* block : *) t block
+| LOAD_CALLABLE_ATTR of (* name : *) string
+| CALL_ATTR of (* argc : *) int
 [@@deriving show]
 
 let address_of_ptr ptr = 2*(Obj.magic ptr)
@@ -60,13 +62,15 @@ let address_of_ptr ptr = 2*(Obj.magic ptr)
 let str_of_instr instr =
   let module S = Str in
   let pretty_list l =
-    let rec commacat acc strs =
-      match strs with
-        [] -> acc
-      | s::[] -> s
-      | s::ss -> commacat (s ^ "," ^ acc) ss
-    in
-    "(" ^ (commacat "" l) ^ ")"
+    match l with
+      [] -> "()"
+    | str::strs ->
+        let rec commacat acc strs =
+          match strs with
+            [] -> acc
+          | s::ss -> commacat (acc ^ ", " ^ s) ss
+        in
+        "(" ^ (commacat str strs) ^ ")"
   in
   let str =
     match instr with
@@ -80,11 +84,13 @@ let str_of_instr instr =
     | LOAD_GLOBAL s          -> sprintf "LOAD_GLOBAL\t\t\"%s\"" s
     | LOAD_NAME s            -> sprintf "LOAD_NAME\t\t\"%s\"" s
     | LOAD_ATTR s            -> sprintf "LOAD_ATTR\t\t\"%s\"" s
+    | LOAD_CALLABLE_ATTR s   -> sprintf "LOAD_CALLABLE_ATTR\t\"%s\"" s
     | JUMP i                 -> sprintf "JUMP\t\t\t%d" i
     | POP_JUMP_IF_FALSE i    -> sprintf "POP_JUMP_IF_FALSE\t%d" i
     | JUMP_IF_TRUE_OR_POP i  -> sprintf "JUMP_IF_TRUE_OR_POP\t%d" i
     | JUMP_IF_FALSE_OR_POP i -> sprintf "JUMP_IF_FALSE_OR_POP\t%d" i
     | CALL_FUNCTION i        -> sprintf "CALL_FUNCTION\t\t%d" i
+    | CALL_ATTR i          -> sprintf "CALL_ATTR\t\t%d" i
     | MAKE_FUNCTION(a, b) ->
         (sprintf "MAKE_FUNCTION\t\t%s " (pretty_list a)) ^
         (sprintf "<function %s at 0x%x>" b.name (address_of_ptr b.ptr))

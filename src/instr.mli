@@ -48,6 +48,8 @@ type t =
 | CALL_FUNCTION of (* argc : *) int
 | MAKE_FUNCTION of (* args : *) string list * (* block : *) t block
 | MAKE_CLASS of (* number of superclasses : *) int * (* block : *) t block
+| LOAD_CALLABLE_ATTR of (* name : *) string
+| CALL_ATTR of (* argc : *) int
 [@@deriving show]
 
 (* prints an array of instructions in readable format *)

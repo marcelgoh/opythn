@@ -115,6 +115,7 @@ let lookup_global envr id = lookup_scope_list envr.globals id
 let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
   (* stack machine *)
   let (stack : Py_val.t S.t) = S.create () in
+  (* set to true if the next CALL_FUNCTION is a method call *)
   let s_push pv = S.push pv stack in
   let store_name scope id =
     let tos = S.pop stack in
@@ -124,6 +125,26 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
     struct
       exception Exit of Py_val.t
     end
+  in
+  let load_attr callable id =
+    let tos = S.pop stack in
+    let instr_name = if callable then "LOAD_CALLABLE_ATTR" else "LOAD_ATTR" in
+    (match tos with
+       Obj obj ->
+         (match Py_val.get_field_opt obj id with
+            Some pval -> s_push pval;
+                         if callable then s_push tos else ()
+          | None ->
+              raise (Runtime_error
+                       (sprintf "Object has no attribute `%s`: %s" id instr_name)))
+     | Class cls ->
+         (match Py_val.get_attr_opt cls id with
+            Some pval -> s_push pval
+          | None ->
+              raise (Runtime_error
+                       (sprintf "Class has no attribute `%s`: %s" id instr_name)))
+     | _ -> raise (Runtime_error
+                     (sprintf "Object has no attribute `%s`: %s" id instr_name)))
   in
   (* loop over instructions *)
   let rec loop idx =
@@ -336,14 +357,25 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
              let retval =
                match S.pop stack with
                  Fun (_, f) -> f !arglist
-               | _     -> raise (Runtime_error "Tried to apply non-function object: CALL_FUNCTION")
+               | Class c ->
+                   let obj = Obj { cls = c; fields = c.attrs; } in
+                   (* if class has __init__ method, call it *)
+                   (match H.find_opt c.attrs "__init__" with
+                      Some (Fun (_, f)) ->
+                        f (obj :: !arglist) |> ignore;
+                    | _ -> ()
+                   );
+                   obj
+               | _     -> raise (Runtime_error "Tried to apply uncallable object: CALL_FUNCTION")
              in
              s_push retval
          | MAKE_FUNCTION (params, block) ->
              s_push (Fun (block.name,
                        (fun args ->
                           if List.length params <> List.length args then
-                            raise (Runtime_error "Wrong argument count: MAKE_FUNCTION")
+                            raise (Runtime_error
+                                     (sprintf "Wrong argument count for function `%s`: MAKE_FUNCTION"
+                                              block.name))
                           else (
                             let new_locals = H.create 5 in
                             List.iter2 (fun param arg -> H.add new_locals param arg) params args;
@@ -367,7 +399,7 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
                              attrs = H.create 10 }
              in
              let new_envr = { envr with cls = Some new_cls } in
-             run !(block.ptr) new_envr;
+             run !(block.ptr) new_envr |> ignore;
              s_push (Class new_cls)
          | STORE_NAME id ->
              (* bind variable in innermost scope *)
@@ -405,23 +437,6 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
                 | None -> search_scopes)
              in
              s_push value_to_push
-         | LOAD_ATTR id ->
-             let tos = S.pop stack in
-             (match tos with
-                Obj obj ->
-                  (match Py_val.get_field_opt obj id with
-                     Some pval -> s_push pval
-                   | None ->
-                       raise (Runtime_error
-                                (sprintf "Object has no attribute `%s`: LOAD_ATTR" id)))
-              | Class cls ->
-                  (match Py_val.get_attr_opt cls id with
-                     Some pval -> s_push pval
-                   | None ->
-                       raise (Runtime_error
-                                (sprintf "Class has no attribute `%s`: LOAD_ATTR" id)))
-              | _ -> raise (Runtime_error
-                              (sprintf "Object has no attribute `%s`: LOAD_ATTR" id)))
          | STORE_ATTR id ->
              let tos = S.pop stack in
              let tos1 = S.pop stack in
@@ -430,6 +445,21 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
               | Class cls -> H.replace cls.attrs id tos1
               | _ -> raise (Runtime_error
                               (sprintf "Cannot set attribute `%s`: STORE_ATTR" id)))
+         | LOAD_ATTR id ->
+             load_attr false id
+         | LOAD_CALLABLE_ATTR id ->
+             load_attr true id
+         | CALL_ATTR argc ->
+             let arglist = ref [] in
+             for _ = 0 to argc do
+               arglist := (S.pop stack) :: !arglist
+             done;
+             let retval =
+               match S.pop stack with
+                 Fun (_, f) -> f !arglist
+               | _     -> raise (Runtime_error "Tried to apply uncallable object: CALL_ATTR")
+             in
+             s_push retval
         );
       loop !next
     )
