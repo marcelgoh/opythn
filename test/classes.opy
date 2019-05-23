@@ -5,6 +5,9 @@ class Animal:
     def talk(self):
         print(self.message)
 
+    def print_three():
+        print(3)
+
 class Mammal(Animal):
     def talk(self):
         print("I am fuzzy.")
@@ -36,6 +39,9 @@ dracula.fly()
 j = Human("jill")
 print(j.name)
 j.talk()
+
+Animal.print_three()
+Human.print_three()
 
 def foo():
     x = 12

@@ -139,7 +139,8 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
                        (sprintf "Object has no attribute `%s`: %s" id instr_name)))
      | Class cls ->
          (match Py_val.get_attr_opt cls id with
-            Some pval -> s_push pval
+            Some pval -> s_push pval;
+                         if callable then s_push tos else ()
           | None ->
               raise (Runtime_error
                        (sprintf "Class has no attribute `%s`: %s" id instr_name)))
@@ -404,37 +405,38 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
          | STORE_NAME id ->
              (* bind variable in innermost scope *)
              (match envr.cls with
-                Some c -> store_name c.attrs id
+                Some c ->
+                  store_name c.attrs id
               | None ->
                   (match envr.locals with
                      (s :: _) -> store_name s id
                    | [] -> store_name (List.hd envr.globals) id))
          | LOAD_NAME id ->
              (* search all scopes *)
-             let search_scopes : Py_val.t =
+             let search_scopes id : Py_val.t =
                let rec iter slist : Py_val.t option =
-                 match slist with
-                   [] -> None
-                 | (s :: ss) ->
-                     (match H.find_opt s id with
-                        Some pval -> Some pval
-                      | None -> iter ss)
+                 (match slist with
+                    [] -> None
+                  | (s :: ss) ->
+                      (match H.find_opt s id with
+                         Some pval -> Some pval
+                       | None -> iter ss))
                in
-               match iter envr.locals with
-                 Some pval -> pval
-               | None ->
-                   (match iter envr.globals with
-                      Some pval -> pval
-                    | None -> raise (Runtime_error
-                                      (sprintf "Variable `%s` not found: LOAD_NAME" id)))
+               (match iter envr.locals with
+                  Some pval -> pval
+                | None ->
+                    (match iter envr.globals with
+                       Some pval -> pval
+                     | None -> raise (Runtime_error
+                                       (sprintf "Variable `%s` not found: LOAD_NAME" id))))
              in
              let value_to_push =
                (match envr.cls with
                   Some c ->
                     (match H.find_opt c.attrs id with
                        Some pval -> pval
-                     | None -> search_scopes)
-                | None -> search_scopes)
+                     | None -> search_scopes id)
+                    | None -> search_scopes id)
              in
              s_push value_to_push
          | STORE_ATTR id ->
@@ -454,9 +456,14 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
              for _ = 0 to argc do
                arglist := (S.pop stack) :: !arglist
              done;
+             let real_arglist =
+               match !arglist with
+                 (Obj _ :: _) -> !arglist
+               | _ -> List.tl !arglist
+             in
              let retval =
                match S.pop stack with
-                 Fun (_, f) -> f !arglist
+                 Fun (_, f) -> f real_arglist
                | _     -> raise (Runtime_error "Tried to apply uncallable object: CALL_ATTR")
              in
              s_push retval
