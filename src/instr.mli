@@ -12,31 +12,33 @@ type 'a block = {
 type t =
 (* stack operations *)
   NOP | POP_TOP
-(* unary operations: TOS = <op> TOS *)
+(* unary operations: TOS <- <op> TOS *)
 | UNARY_NEG | UNARY_NOT | UNARY_BW_COMP
-(* binary operations: TOS = TOS1 <op> TOS *)
+(* binary operations: TOS <- TOS1 <op> TOS *)
 | BINARY_ADD     | BINARY_SUB     | BINARY_MULT
 | BINARY_FP_DIV  | BINARY_INT_DIV | BINARY_MOD
 | BINARY_EXP     | BINARY_LSHIFT  | BINARY_RSHIFT
 | BINARY_BW_AND  | BINARY_BW_OR   | BINARY_BW_XOR
-(* binary comparison: TOS = TOS1 <comp> TOS *)
+(* binary comparison: TOS <- TOS1 <comp> TOS *)
 | COMPARE_EQ     | COMPARE_NEQ    | COMPARE_LT
 | COMPARE_GT     | COMPARE_LEQ    | COMPARE_GEQ
 | COMPARE_IS     | COMPARE_IN     | COMPARE_NOT_IN
 | COMPARE_IS_NOT
 (* return TOS to caller *)
 | RETURN_VALUE
-(* name = TOS *)
+(* name <- TOS *)
 | STORE_LOCAL of (* depth : *) int * (* name : *) string
 | STORE_GLOBAL of (* name : *) string
 | STORE_NAME of (* name : *) string
-| STORE_ATTR of (* name : *) string
-(* TOS = value *)
+(* TOS <- value *)
 | LOAD_CONST of (* value : *) Py_val.t
-(* TOS = name *)
+(* TOS <- name *)
 | LOAD_LOCAL of (* depth : *) int * (* name : *) string
 | LOAD_GLOBAL of (* name : *) string
 | LOAD_NAME of (* name : *) string
+(* TOS.name <- TOS1 *)
+| STORE_ATTR of (* name : *) string
+(* TOS <- TOS.name *)
 | LOAD_ATTR of (* name : *) string
 (* other operations *)
 | JUMP of (* target : *) int

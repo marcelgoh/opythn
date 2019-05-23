@@ -103,7 +103,7 @@ let py_in pv1 pv2 =
 let rec lookup_scope_list s_list id =
   match s_list with
     [] ->
-      raise (Runtime_error (Printf.sprintf "Variable \"%s\" not found: LOAD_GLOBAL" id))
+      raise (Runtime_error (Printf.sprintf "Variable `%s` not found: LOAD_GLOBAL" id))
   | s::ss ->
       (match H.find_opt s id with
          Some pv -> pv
@@ -317,7 +317,7 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
                 None -> raise (Runtime_error "Tried to access non-existent scope: LOAD_LOCAL")
               | Some scope ->
                   (match H.find_opt scope id with
-                     None -> raise (Runtime_error (sprintf "Variable \"%s\" not found: LOAD_LOCAL" id))
+                     None -> raise (Runtime_error (sprintf "Variable `%s` not found: LOAD_LOCAL" id))
                    | Some pv -> s_push pv))
          | LOAD_GLOBAL id -> s_push @@ lookup_global envr id
          | JUMP t -> next := t
@@ -345,11 +345,91 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
                           if List.length params <> List.length args then
                             raise (Runtime_error "Wrong argument count: MAKE_FUNCTION")
                           else (
-                            let new_scope = H.create 5 in
-                            List.iter2 (fun param arg -> H.add new_scope param arg) params args;
+                            let new_locals = H.create 5 in
+                            List.iter2 (fun param arg -> H.add new_locals param arg) params args;
                             (* run codeblock with new scope pushed onto locals list *)
-                            run !(block.ptr) { envr with locals = new_scope :: envr.locals }
+                            run !(block.ptr) { cls = None;
+                                               locals = new_locals :: envr.locals;
+                                               globals = envr.globals; }
                           ))))
+         | MAKE_CLASS (num_supers, block) ->
+             let tos_opt = if num_supers = 1 then Some (S.pop stack) else None in
+             let super_opt : Py_val.cls option =
+               match tos_opt with
+                 None -> None
+               | Some pval ->
+                   (match pval with
+                      Class c -> Some c
+                    | _ -> raise (Runtime_error "Top of stack is not a class: MAKE_CLASS"))
+             in
+             let new_cls = { name = block.name;
+                             super = super_opt;
+                             attrs = H.create 10 }
+             in
+             let new_envr = { envr with cls = Some new_cls } in
+             run !(block.ptr) new_envr;
+             s_push (Class new_cls)
+         | STORE_NAME id ->
+             (* bind variable in innermost scope *)
+             (match envr.cls with
+                Some c -> store_name c.attrs id
+              | None ->
+                  (match envr.locals with
+                     (s :: _) -> store_name s id
+                   | [] -> store_name (List.hd envr.globals) id))
+         | LOAD_NAME id ->
+             (* search all scopes *)
+             let search_scopes : Py_val.t =
+               let rec iter slist : Py_val.t option =
+                 match slist with
+                   [] -> None
+                 | (s :: ss) ->
+                     (match H.find_opt s id with
+                        Some pval -> Some pval
+                      | None -> iter ss)
+               in
+               match iter envr.locals with
+                 Some pval -> pval
+               | None ->
+                   (match iter envr.globals with
+                      Some pval -> pval
+                    | None -> raise (Runtime_error
+                                      (sprintf "Variable `%s` not found: LOAD_NAME" id)))
+             in
+             let value_to_push =
+               (match envr.cls with
+                  Some c ->
+                    (match H.find_opt c.attrs id with
+                       Some pval -> pval
+                     | None -> search_scopes)
+                | None -> search_scopes)
+             in
+             s_push value_to_push
+         | LOAD_ATTR id ->
+             let tos = S.pop stack in
+             (match tos with
+                Obj obj ->
+                  (match Py_val.get_field_opt obj id with
+                     Some pval -> s_push pval
+                   | None ->
+                       raise (Runtime_error
+                                (sprintf "Object has no attribute `%s`: LOAD_ATTR" id)))
+              | Class cls ->
+                  (match Py_val.get_attr_opt cls id with
+                     Some pval -> s_push pval
+                   | None ->
+                       raise (Runtime_error
+                                (sprintf "Class has no attribute `%s`: LOAD_ATTR" id)))
+              | _ -> raise (Runtime_error
+                              (sprintf "Object has no attribute `%s`: LOAD_ATTR" id)))
+         | STORE_ATTR id ->
+             let tos = S.pop stack in
+             let tos1 = S.pop stack in
+             (match tos with
+                Obj obj -> H.replace obj.fields id tos1
+              | Class cls -> H.replace cls.attrs id tos1
+              | _ -> raise (Runtime_error
+                              (sprintf "Cannot set attribute `%s`: STORE_ATTR" id)))
         );
       loop !next
     )

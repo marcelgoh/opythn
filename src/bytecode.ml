@@ -298,7 +298,7 @@ let rec compile_stmts in_class stmts enclosings table =
                                                   ptr = ref code_block }))
      | AttrRef(e, id) ->
          compile_and_add_expr e;
-         D.add instrs (LOAD_ATTR id)
+         D.add expr_instrs (LOAD_ATTR id)
      | None -> D.add expr_instrs (LOAD_CONST None)
     );
     expr_instrs
@@ -384,8 +384,7 @@ let rec compile_stmts in_class stmts enclosings table =
          (* side effect: pushes superclass onto stack if needed *)
          let num_supers =
            match super with
-             Some s -> let instr = get_load_instr [] s in
-                       D.add instrs instr;
+             Some s -> D.add instrs (LOAD_NAME s);
                        1
            | None -> 0
          in
