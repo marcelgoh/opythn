@@ -25,19 +25,21 @@ let as_bool = function
 | Float f -> f <> 0.0
 | Str s -> s <> ""
 | Fun (_, _) -> true
+| Obj _ | Class _ | Type _
 | None -> false
 
 let as_int = function
   Int i  -> i
 | Bool b -> if b then 1 else 0
-| Float _ | Str _ | Fun _ | None ->
+| Float _ | Str _ | Fun _
+| Obj _ | Class _ | Type _ | None ->
     raise Type_error
 
 let as_float = function
   Int i   -> float_of_int i
 | Float f -> f
 | Bool b  -> if b then 1.0 else 0.0
-| Str _ | Fun _ | None ->
+| Str _ | Fun _ | Obj _ | Class _ | Type _ | None ->
     raise Type_error
 
 let is_float = function
@@ -96,7 +98,8 @@ let lt pv1 pv2 = (* uses OCaml's structural comparison *)
 
 let py_in pv1 pv2 =
   match pv2 with
-    Int _ | Float _ | Bool _ | Str _ | Fun _ | None ->
+    Int _ | Float _ | Bool _ | Str _ | Fun _
+  | Obj _ | Class _ | Type _ | None ->
       raise Type_error (* not iterable *)
 
 (* environment functions *)

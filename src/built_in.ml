@@ -28,7 +28,13 @@ let print args =
        | Str s ->
            printf "%s" s
        | Fun(name, _) ->
-           printf "<function %s>" name
+           printf "<Function `%s`>" name
+       | Obj obj ->
+           printf "<`%s` object>" obj.cls.name
+       | Class cls ->
+           printf "<Class `%s`>" cls.name
+       | Type str ->
+           printf "<Type `%s`>" str
        | None ->
            printf "None"
       );
@@ -47,7 +53,7 @@ let abs args =
       Int i -> Int (abs i)
     | Bool b -> if b then (Int 1) else (Int 0)
     | Float f -> Float (abs_float f)
-    | Str _ | Fun _ | None ->
+    | Str _ | Fun _ | Obj _ | Class _ | Type _ | None ->
         raise (Built_in_error "Cannot operate on non-numeric type: ABS()")
 
 (* bin() *)
@@ -59,7 +65,7 @@ let bin args =
       match List.hd args with
         Int i -> i
       | Bool b -> if b then 1 else 0
-      | Float _ | Str _ | Fun _ | None ->
+      | Float _ | Str _ | Fun _ | Obj _ | Class _ | Type _ | None ->
           raise (Built_in_error "Cannot operate on non integer type: BIN()")
     in
     let sign = if num < 0 then "-" else "" in
@@ -83,7 +89,10 @@ let bool_cast args =
         Int i -> Bool (i <> 0)
       | Bool b -> Bool b
       | Float f -> Bool (f <> 0.0)
+      | Type s
       | Str s -> Bool (s <> "")
+      | Obj _
+      | Class _
       | Fun(_, _) -> Bool true
       | None -> Bool false
 
@@ -96,7 +105,7 @@ let chr_ascii args =
       match List.hd args with
         Int i -> i
       | Bool b -> if b then 1 else 0
-      | Float _ | Str _ | Fun _ | None ->
+      | Float _ | Str _ | Fun _ | Obj _ | Class _ | Type _ | None ->
           raise (Built_in_error "Cannot operate on non integer type: CHR()")
     in
     if num < 0 || num > 255 then
@@ -114,7 +123,7 @@ let float_cast args =
     | Float f -> Float f
     | Str s   -> Float (float_of_string s)
     | Bool b  -> if b then Float 1.0 else Float 0.0
-    | Fun _ | None ->
+    | Fun _ | Obj _ | Class _ | Type _ | None ->
         raise (Built_in_error "Failed typecast: FLOAT_CAST()")
 
 (* hex() and oct() *)
@@ -126,7 +135,7 @@ let hex_oct is_hex args =
       match List.hd args with
         Int i -> i
       | Bool b -> if b then 1 else 0
-      | Float _ | Str _ | Fun _ | None ->
+      | Float _ | Str _ | Fun _ | Obj _ | Class _ | Type _ | None ->
           raise (Built_in_error "Cannot operate on non integer type: HEX()")
     in
     let sign = if num < 0 then "-" else "" in
@@ -154,7 +163,7 @@ let int_cast args =
     | Float f -> Int (int_of_float f)
     | Str s   -> Int (int_of_string s)
     | Bool b  -> if b then Int 1 else Int 0
-    | Fun _ | None ->
+    | Fun _ | Obj _ | Class _ | Type _ | None ->
         raise (Built_in_error "Failed typecast: INT_CAST()")
 
 (* ord() -- only supports ASCII, doesn't match Python 3 exactly *)
@@ -165,7 +174,8 @@ let ord args =
     let str =
       match List.hd args with
         Str s -> s
-      | Int _ | Float _ | Bool _ | Fun _ | None ->
+      | Int _ | Float _ | Bool _ | Fun _
+      | Obj _ | Class _ | Type _ | None ->
           raise (Built_in_error "String expected: ORD()")
     in
     if String.length str <> 1 then
@@ -189,13 +199,13 @@ let round args =
               Int i   -> float_of_int i
             | Bool b  -> if b then 1.0 else 0.0
             | Float f -> f
-            | Str _ | Fun _ | None ->
+            | Str _ | Fun _ | Obj _ | Class _ | Type _ | None ->
                 raise (Built_in_error "Cannot round non-numeric type: ROUND()")
     in
     let d = match digits with
               Int i  -> i
             | Bool b -> if b then 1 else 0
-            | Float _ | Str _ | Fun _ | None ->
+            | Float _ | Str _ | Fun _ | Obj _ | Class _ | Type _ | None ->
                 raise (Built_in_error "Precision must be integer: ROUND()")
     in
     (* round to nearest integer *)
