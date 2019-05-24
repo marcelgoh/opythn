@@ -31,7 +31,6 @@ _build/
 *.aux
 *.log
 *.gz
-*.sty
 
 # Test output
 test/*.txt
