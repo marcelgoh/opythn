@@ -229,17 +229,9 @@ let rec compile_stmts in_class stmts enclosings table =
      | BoolLit b -> D.add expr_instrs (LOAD_CONST (Bool b))
      | StrLit s -> D.add expr_instrs (LOAD_CONST (Str s))
      | Call (f, args) ->
-         let argc = List.length args in
          compile_and_add_expr f;
-         (match D.last expr_instrs with
-            LOAD_ATTR id ->
-              (* we're going to call an attribute *)
-              D.set expr_instrs (D.length expr_instrs - 1) (LOAD_CALLABLE_ATTR id);
-              List.iter compile_and_add_expr args;
-              D.add expr_instrs (CALL_ATTR argc)
-          | _ ->
-              List.iter compile_and_add_expr args;
-              D.add expr_instrs (CALL_FUNCTION argc))
+         List.iter compile_and_add_expr args;
+         D.add expr_instrs (CALL_FUNCTION (List.length args))
      | Op (And, args) ->
          (match args with
             e1::e2::_ ->

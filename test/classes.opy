@@ -54,3 +54,4 @@ def foo():
     abc.bar()
 
 foo()
+

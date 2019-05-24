@@ -111,6 +111,12 @@ let rec lookup_scope_list s_list id =
 
 let lookup_global envr id = lookup_scope_list envr.globals id
 
+(* suppose f is a function that takes in a list of py_vals as argument
+ * (create_method f obj) returns a function that takes in a list [a1; a2; ...]
+ * and calls f [obj; a1; a2; ...]
+ *)
+let create_method f obj = (fun arglist -> f (obj :: arglist))
+
 (* run code on virtual stack machine *)
 let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
   (* stack machine *)
@@ -125,27 +131,6 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
     struct
       exception Exit of Py_val.t
     end
-  in
-  let load_attr callable id =
-    let tos = S.pop stack in
-    let instr_name = if callable then "LOAD_CALLABLE_ATTR" else "LOAD_ATTR" in
-    (match tos with
-       Obj obj ->
-         (match Py_val.get_field_opt obj id with
-            Some pval -> s_push pval;
-                         if callable then s_push tos else ()
-          | None ->
-              raise (Runtime_error
-                       (sprintf "Object has no attribute `%s`: %s" id instr_name)))
-     | Class cls ->
-         (match Py_val.get_attr_opt cls id with
-            Some pval -> s_push pval;
-                         if callable then s_push tos else ()
-          | None ->
-              raise (Runtime_error
-                       (sprintf "Class has no attribute `%s`: %s" id instr_name)))
-     | _ -> raise (Runtime_error
-                     (sprintf "Object has no attribute `%s`: %s" id instr_name)))
   in
   (* loop over instructions *)
   let rec loop idx =
@@ -359,7 +344,7 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
                match S.pop stack with
                  Fun (_, f) -> f !arglist
                | Class c ->
-                   let obj = Obj { cls = c; fields = c.attrs; } in
+                   let obj = Obj { cls = c; fields = H.create 10; } in
                    (* if class has __init__ method, call it *)
                    (match H.find_opt c.attrs "__init__" with
                       Some (Fun (_, f)) ->
@@ -448,25 +433,29 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
               | _ -> raise (Runtime_error
                               (sprintf "Cannot set attribute `%s`: STORE_ATTR" id)))
          | LOAD_ATTR id ->
-             load_attr false id
-         | LOAD_CALLABLE_ATTR id ->
-             load_attr true id
-         | CALL_ATTR argc ->
-             let arglist = ref [] in
-             for _ = 0 to argc do
-               arglist := (S.pop stack) :: !arglist
-             done;
-             let real_arglist =
-               match !arglist with
-                 (Obj _ :: _) -> !arglist
-               | _ -> List.tl !arglist
-             in
-             let retval =
-               match S.pop stack with
-                 Fun (_, f) -> f real_arglist
-               | _     -> raise (Runtime_error "Tried to apply uncallable object: CALL_ATTR")
-             in
-             s_push retval
+             let tos = S.pop stack in
+             (match tos with
+                Obj obj ->
+                  (match Py_val.get_field_opt obj id with
+                     Some pval ->
+                       (match pval with
+                          Fun (_, f) ->
+                            let cls_name = obj.cls.name in
+                            let method_name = sprintf "%s.%s method of %s object" cls_name id cls_name in
+                            s_push (Fun (method_name, (create_method f (Obj obj))))
+                        | _ -> s_push pval)
+                   | None ->
+                       raise (Runtime_error
+                                (sprintf "Object has no attribute `%s`: LOAD_ATTR" id)))
+              | Class cls ->
+                  (match Py_val.get_attr_opt cls id with
+                     Some pval -> s_push pval;
+                   | None ->
+                       raise (Runtime_error
+                                (sprintf "Class has no attribute `%s`: LOAD_ATTR" id)))
+              | _ -> raise (Runtime_error
+                              (sprintf "Object has no attribute `%s`: LOAD_ATTR" id))
+             );
         );
       loop !next
     )
