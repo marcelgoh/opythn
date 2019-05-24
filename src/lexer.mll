@@ -96,6 +96,7 @@
   (* check if lexbuf is at start of line *)
   let curr_col l = l.lex_start_p.pos_cnum - l.lex_start_p.pos_bol
   let is_start_of_line l = (curr_col l = 0)
+  let last_token_was_newline = ref true
 }
 
 let integer = '-'? ['1'-'9'] ['0'-'9']* | '-'? '0'*
@@ -201,11 +202,25 @@ and read_line_comment completely_blank =
   | _       { read_line_comment completely_blank lexbuf }
 
 {
-  let read lexbuf =
-    (* if the read queue has tokens in it, no need to consume new token yet *)
-    if Queue.is_empty read_queue then
-      read_one lexbuf
-    else Queue.take read_queue
+  let rec read lexbuf =
+    let ret_token =
+      (* if the read queue has tokens in it, no need to consume new token yet *)
+      if Queue.is_empty read_queue then
+        read_one lexbuf
+      else Queue.take read_queue
+    in
+    match ret_token with
+      NEWLINE ->
+        if !last_token_was_newline then
+          read lexbuf
+        else (
+          last_token_was_newline := true;
+          NEWLINE
+        )
+    | _ ->
+        last_token_was_newline := false;
+        ret_token
+
   let setup_file_input lexbuf =
     Queue.add START_FILE read_queue
   let setup_repl_input lexbuf =
