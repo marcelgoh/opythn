@@ -32,7 +32,7 @@ let print_entry str depth =
 let print_asm = Instr.print_instr_array
 
 (* recursively compile statements *)
-let rec compile_stmts in_class stmts enclosings table =
+let rec compile_stmts in_repl in_class stmts enclosings table =
 
   let is_global = enclosings = [] in
 
@@ -105,7 +105,10 @@ let rec compile_stmts in_class stmts enclosings table =
              resolve_expr e;
              (match H.find_opt table s with
                 Some Referred ->
-                  raise (Bytecode_error (sprintf "Local name `%s` used before assignment" s))
+                  if not in_repl then
+                    raise (Bytecode_error (sprintf "Local name `%s` used before assignment" s))
+                  else
+                    ()
               | _ -> ());
              add_name s
          | Assign(AttrRef(obj, _), e) ->
@@ -362,7 +365,7 @@ let rec compile_stmts in_class stmts enclosings table =
      | Funcdef (name, args, body) ->
          let new_table = H.create 10 in
          List.iter (fun s -> H.replace new_table s (Local 0)) args;
-         let code_block : code = compile_stmts false body (table::enclosings) new_table in
+         let code_block : code = compile_stmts in_repl false body (table::enclosings) new_table in
          D.add instrs (MAKE_FUNCTION (args, { name = name;
                                               ptr = ref code_block }));
          compile_id name
@@ -380,7 +383,7 @@ let rec compile_stmts in_class stmts enclosings table =
          else
            D.add instrs (JUMP (-20)) (* -20 indicates continue *)
      | Classdef (name, super, body) ->
-         let code_block = compile_stmts true body enclosings table in
+         let code_block = compile_stmts in_repl true body enclosings table in
          (* side effect: pushes superclass onto stack if needed *)
          let num_supers =
            match super with
@@ -410,4 +413,5 @@ let rec compile_stmts in_class stmts enclosings table =
   instrs
 
 (* interface to the rest of the system *)
-let compile_prog (p : Ast.program) : code = compile_stmts false p [] (H.create 10)
+let compile_prog in_repl (p : Ast.program) : code =
+  compile_stmts in_repl false p [] (H.create 10)

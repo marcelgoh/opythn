@@ -213,6 +213,22 @@ let round args =
     let factor = 10.0 ** (float_of_int d) in
     Float ((round' (n *. factor)) /. (factor))
 
+(* type() *)
+let get_type args =
+  if List.length args <> 1 then
+    raise (Built_in_error "Exactly one argument expected: TYPE()")
+  else
+    match List.hd args with
+      Int _   -> Type "int"
+    | Float _ -> Type "float"
+    | Str _   -> Type "str"
+    | Bool _  -> Type "bool"
+    | Fun _   -> Type "function"
+    | Obj o   -> Type o.cls.name
+    | Class _ -> Type "type"
+    | Type _  -> Type "type"
+    | None    -> Type "NoneType"
+
 (* built-in scope *)
 let table : (string, Py_val.t) Hashtbl.t =
   let s = H.create 33 in
@@ -228,5 +244,6 @@ let table : (string, Py_val.t) Hashtbl.t =
   H.add s "ord" (Fun ("ord", ord));
   H.add s "print" (Fun ("print", print_ln));
   H.add s "round" (Fun ("round", round));
+  H.add s "type" (Fun ("type", get_type));
   s
 

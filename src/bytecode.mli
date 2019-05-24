@@ -7,4 +7,4 @@ type code = Instr.t DynArray.t
 val print_asm : code -> unit
 
 (* compile a program to bytecode *)
-val compile_prog : Ast.program -> code
+val compile_prog : bool -> Ast.program -> code

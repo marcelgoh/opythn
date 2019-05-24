@@ -64,7 +64,7 @@ let from_file opy_code =
   );
   Lexer.setup_file_input !buffer;
   let tree = parse !buffer in
-  let instrs = Bytecode.compile_prog tree in
+  let instrs = Bytecode.compile_prog false tree in
   if !debug then (
     printf "************ PARSER OUTPUT *************\n";
     printf "%s\n" (Ast.show tree);
@@ -87,7 +87,7 @@ let rec repl () =
     let buffer = Lexing.from_channel stdin in
     Lexer.setup_repl_input buffer;
     let tree = parse buffer in
-    let instrs = Bytecode.compile_prog tree in
+    let instrs = Bytecode.compile_prog true tree in
     if !debug then (
       printf "************ PARSER OUTPUT *************\n";
       printf "%s\n" (Ast.show tree);
@@ -182,7 +182,7 @@ let rec ctrlc () =
 let print_splash () =
   printf "+----------------------------------------------+\n";
   printf "|            OPYTHN INTERACTIVE MODE           |\n";
-  printf "|   Author: Marcel Goh (Release: 23.05.2019)   |\n";
+  printf "|   Author: Marcel Goh (Release: 24.05.2019)   |\n";
   printf "|          Type \"Ctrl-C\" for options.          |\n";
   printf "+----------------------------------------------+\n"
 
