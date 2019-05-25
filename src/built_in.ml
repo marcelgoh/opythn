@@ -229,6 +229,52 @@ let get_type args =
     | Type _  -> Type "type"
     | None    -> Type "NoneType"
 
+(* these functions rely on type() *)
+
+(* issubclass() *)
+let rec issubclass args =
+  match args with
+    [pv1; pv2] ->
+      (match (pv1, pv2) with
+         (Class c1, Class c2) ->
+           if c1.name = c2.name then
+             Bool true
+           else
+             (match c1.super with
+                None ->
+                  Bool false
+              | Some sc ->
+                  issubclass [Class sc; pv2])
+       | _ ->
+           raise (Built_in_error "Both arguments must be classes: ISSUBCLASS()"))
+  | _ ->
+      raise (Built_in_error "Exactly two arguments expected: ISSUBCLASS()")
+
+(* isinstance() *)
+let isinstance args =
+  match args with
+    [pv1; pv2] ->
+      (match pv2 with
+         Class c ->
+           (match pv1 with
+              Obj o ->
+                if o.cls.name = c.name then
+                  Bool true
+                else
+                  (match o.cls.super with
+                     Some superclass -> issubclass [Class superclass; pv2]
+                   | None -> Bool false)
+            | _ -> Bool false)
+       | Type t ->
+           (match get_type [pv1] with
+              Type str -> Bool (t = str)
+            | _ -> Bool false)
+       | Int _ | Float _ | Str _ | Bool _ | Fun _ | Obj _ | None ->
+           raise (Built_in_error "Second argument must be a class or type: ISINSTANCE()")
+      )
+  | _ ->
+      raise (Built_in_error "Exactly two arguments expected: ISINSTANCE()")
+
 (* built-in scope *)
 let table : (string, Py_val.t) Hashtbl.t =
   let s = H.create 33 in
@@ -239,6 +285,8 @@ let table : (string, Py_val.t) Hashtbl.t =
   H.add s "float" (Fun ("float", float_cast));
   H.add s "hex" (Fun ("hex", (hex_oct true)));
   H.add s "input" (Fun ("input", input));
+  H.add s "isinstance" (Fun ("isinstance", isinstance));
+  H.add s "issubclass" (Fun ("issubclass", issubclass));
   H.add s "int" (Fun ("int", int_cast));
   H.add s "oct" (Fun ("oct", (hex_oct false)));
   H.add s "ord" (Fun ("ord", ord));
