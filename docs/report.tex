@@ -90,7 +90,7 @@
     \end{center}
     Any string that is not a keyword and contains uppercase and lowercase letters, underscores, and (except for the first character) numbers is a valid identifier. Case is significant. Some names are reserved for use by OPythn's standard library functions, which are further described in Section 3.2.7.
     \subsubsection{Literals}
-    Strings are enclosed in matching single quotes or double quotes. Triple-quoted strings are not supported, nor are formatted string literals. The backslash character \ms{\textbackslash} is used to escape certain characters such as tabs and newlines.
+    Strings are enclosed in matching single quotes or double quotes. Triple-quoted strings are not supported, nor are formatted string literals. The backslash character \ms{\textbackslash} is used to escape certain characters such as tabs and newlines.\\
     \indent There are two types of numeric literals in OPythn: integers and floating-point numbers. Leading zeroes in a non-zero decimal integer are not allowed. Underscores are also not allowed in numeric literals, unlike in Python 3. Floating-point literals are supported, but must be supplied in point form and not in scientific notation.
     \begin{lstlisting}[language=caml]
     integer: '-'? ['1'-'9'] ['0'-'9']* | '-'? '0'*
@@ -150,7 +150,7 @@
     \end{tabular}
     \end{center}
 
-    \subsubsection{Control structures}
+    \subsubsection{Branching structures}
     OPythn inherits the control structures \ms{if}, \ms{for}, and \ms{while} from Python. Like in Python, consecutive lines at the same indentation level belong to the same block. Conditional expressions of the form \ms{<expr> if <condition> else <expr>} are also valid.
 
     \subsubsection{Functions}
@@ -168,16 +168,28 @@
     \end{center}
 
     \subsubsection{Classes and objects}
-    OPythn is object-oriented and allows the user to define classes. However, nested classes and multiple inheritance are not supported. When creating a class, the following special methods can be added to indicate how the class should behave: \ms{\_\_init\_\_()}, \ms{\_\_eq\_\_()}, \ms{\_\_ne\_\_()}, \ms{\_\_str\_\_()}.\\
+    OPythn is object-oriented and allows the user to define classes. Multiple inheritance are not supported. When creating a class, the following special methods can be added to indicate how the class should behave: \ms{\_\_init\_\_()}, \ms{\_\_eq\_\_()}, \ms{\_\_ne\_\_()}, \ms{\_\_str\_\_()}.\\
     \indent OPythn does not allow private attributes and methods. In general, an object's attributes and methods can be accessed and mutated by functions outside the class' definition. All Python values are objects, but the user is not allowed to subclass built-in types.
     \subsubsection{Error handling}
-    OPythn does not include support for exceptions. When an error occurs, the program terminates/returns to the REPL and a stack trace is printed.
+    OPythn does not include support for exceptions. When an error occurs, the program prints an error message and either terminates or returns to the REPL.
 
 
 % IMPLEMENTATION
 \section{Implementation}
 Both the OPythn bytecode compiler and interpreter will be implemented in OCaml. This section gives a rough overview of the process by which OPythn source code is handled and executed.
-    \subsection{Lexical Analysis}
+    \subsection{Lexical analysis}
+    Upon reading source code, the OPythn front-end passes the data as a string to a series of functions that lex the code into tokens. The lexer will be created with the help of \texttt{ocamllex}, a program that generates a deterministic finite automaton in OCaml. This resulting lexer matches regular expressions in the string to convert chunks of characters into the correct tokens.\\
+    \indent The lexer will produce tokens of the following OCaml datatype:
+    \begin{lstlisting}[language=caml]
+    type token =
+      NEWLINE | INDENT | DEDENT
+    | NAME of string  (* identifier *)
+    | IF | WHILE (* other keywords... *)
+    | NUMBER of string
+    | STRING of string
+    | OP of string
+    | DELIM of string
+    \end{lstlisting}
     \indent In OPythn, the amount of leading whitespace at the beginning of a line indicates the indentation level of the line. A tab character counts for exactly four spaces during this computation. Indentation levels of consecutive lines are used to generate \ms{INDENT} and \ms{DEDENT} tokens. This is done by means of a stack using the following algorithm, as described by the standard Python reference \cite{pythonref}.
     \begin{algorithm}
     \caption{Insertion of \ms{INDENT} and \ms{DEDENT} tokens (as part of general lexing procedure)}
@@ -203,29 +215,17 @@ Both the OPythn bytecode compiler and interpreter will be implemented in OCaml. 
                 \EndFor
                 \EndIf
                 \State tokenise the rest of the line and add tokens to $token\_list$
-                \algstore{indent}
-    \end{algorithmic}
-    \end{algorithm}
-    \begin{algorithm}
-    \begin{algorithmic}
-            \algrestore{indent}
+%                \algstore{indent}
+%    \end{algorithmic}
+%    \end{algorithm}
+%    \begin{algorithm}
+%    \begin{algorithmic}
+%            \algrestore{indent}
         \EndWhile
         \State \Return{$token\_list$}
     \EndProcedure
     \end{algorithmic}
     \end{algorithm}
-    Upon reading source code, the OPythn front-end passes the data as a string to a series of functions that lex the code into tokens. The lexer will be created with the help of \texttt{ocamllex}, a program that generates a deterministic finite automaton in OCaml. This resulting lexer matches regular expressions in the string to convert chunks of characters into the correct tokens.\\
-    \indent The lexer will produce tokens of the following OCaml datatype:
-    \begin{lstlisting}[language=caml]
-    type token =
-      NEWLINE | INDENT | DEDENT
-    | NAME of string  (* identifier *)
-    | IF | WHILE (* other keywords... *)
-    | NUMBER of string
-    | STRING of string
-    | OP of string
-    | DELIM of string
-    \end{lstlisting}
     \subsection{Parsing}
     The tokens produced by the lexer is then fed into the parser, which will be implemented according to the grammar rules outlined in Section 2.3 and using \texttt{menhir}, an OCaml parser generator. The result will be an abstract syntax tree that represents the structure and semantics of the OPythn program.\\
      \indent Typed values are represented as follows. To represent an OPythn list, we will need the \ms{DynArray} module from the \ms{extlib} library. To represent a dictionary, we use an OCaml hashtable.
