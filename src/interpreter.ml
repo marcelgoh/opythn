@@ -456,6 +456,15 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
                    | None ->
                        raise (Runtime_error
                                 (sprintf "Class has no attribute `%s`: LOAD_ATTR" id)))
+              | Str s ->
+                  (match H.find_opt Built_in.str_methods id with
+                     Some (Fun (name, f)) ->
+                       let method_name = sprintf "built-in method %s of str object" name in
+                       s_push (Fun (method_name, (create_method f (Str s))))
+                   | _ ->
+                       raise (Runtime_error
+                                (sprintf "Str object has no attribute `%s`: LOAD_ATTR()" id)))
+
               | _ -> raise (Runtime_error
                               (sprintf "Object has no attribute `%s`: LOAD_ATTR" id))
              );

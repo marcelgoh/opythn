@@ -275,23 +275,40 @@ let isinstance args =
   | _ ->
       raise (Built_in_error "Exactly two arguments expected: ISINSTANCE()")
 
+(* string methods *)
+let find args =
+  match args with
+    [pv1; pv2] ->
+      (match (pv1, pv2) with
+         (Str s1, Str s2) ->
+           (Int (try Str.search_forward (Str.regexp_string s2) s1 0
+                 with Not_found -> -1))
+       | _ -> raise (Built_in_error "Method expects a string: FIND()"))
+  | _ ->
+      raise (Built_in_error "Method expects one argument: FIND()")
+
+
 (* built-in scope *)
 let table : (string, Py_val.t) Hashtbl.t =
-  let s = H.create 33 in
-  H.add s "abs" (Fun ("abs", abs));
-  H.add s "bin" (Fun ("bin", bin));
-  H.add s "bool" (Fun ("bool", bool_cast));
-  H.add s "chr" (Fun ("chr", chr_ascii));
-  H.add s "float" (Fun ("float", float_cast));
-  H.add s "hex" (Fun ("hex", (hex_oct true)));
-  H.add s "input" (Fun ("input", input));
-  H.add s "isinstance" (Fun ("isinstance", isinstance));
-  H.add s "issubclass" (Fun ("issubclass", issubclass));
-  H.add s "int" (Fun ("int", int_cast));
-  H.add s "oct" (Fun ("oct", (hex_oct false)));
-  H.add s "ord" (Fun ("ord", ord));
-  H.add s "print" (Fun ("print", print_ln));
-  H.add s "round" (Fun ("round", round));
-  H.add s "type" (Fun ("type", get_type));
-  s
+  let tbl = H.create 33 in
+  H.add tbl "abs" (Fun ("abs", abs));
+  H.add tbl "bin" (Fun ("bin", bin));
+  H.add tbl "bool" (Fun ("bool", bool_cast));
+  H.add tbl "chr" (Fun ("chr", chr_ascii));
+  H.add tbl "float" (Fun ("float", float_cast));
+  H.add tbl "hex" (Fun ("hex", (hex_oct true)));
+  H.add tbl "input" (Fun ("input", input));
+  H.add tbl "isinstance" (Fun ("isinstance", isinstance));
+  H.add tbl "issubclass" (Fun ("issubclass", issubclass));
+  H.add tbl "int" (Fun ("int", int_cast));
+  H.add tbl "oct" (Fun ("oct", (hex_oct false)));
+  H.add tbl "ord" (Fun ("ord", ord));
+  H.add tbl "print" (Fun ("print", print_ln));
+  H.add tbl "round" (Fun ("round", round));
+  H.add tbl "type" (Fun ("type", get_type));
+  tbl
 
+let str_methods : (string, Py_val.t) Hashtbl.t =
+  let tbl = H.create 10 in
+  H.add tbl "find" (Fun ("find", find));
+  tbl
