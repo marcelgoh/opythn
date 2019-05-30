@@ -276,6 +276,8 @@ let isinstance args =
       raise (Built_in_error "Exactly two arguments expected: ISINSTANCE()")
 
 (* string methods *)
+
+(* find() *)
 let find args =
   match args with
     [pv1; pv2] ->
@@ -287,6 +289,18 @@ let find args =
   | _ ->
       raise (Built_in_error "Method expects one argument: FIND()")
 
+(* isupper() *)
+let is_upper args =
+  let is_upper_char c =
+    let lower = Char.lowercase_ascii c in
+    Char.code lower >= 97 && Char.code lower <= 122
+  in
+  match args with
+    [(Str s1)] ->
+      let all_upper = ref true in
+      String.iter (fun c -> if is_upper_char c then () else all_upper := false) s1;
+      Bool !all_upper
+  | _ -> raise (Built_in_error "Method expects exactly one string: IS_UPPER()")
 
 (* built-in scope *)
 let table : (string, Py_val.t) Hashtbl.t =
@@ -311,4 +325,5 @@ let table : (string, Py_val.t) Hashtbl.t =
 let str_methods : (string, Py_val.t) Hashtbl.t =
   let tbl = H.create 10 in
   H.add tbl "find" (Fun ("find", find));
+  H.add tbl "isupper" (Fun ("isupper", is_upper));
   tbl
