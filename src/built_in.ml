@@ -289,16 +289,24 @@ let find args =
   | _ ->
       raise (Built_in_error "Method expects one argument: FIND()")
 
+let is_lower_alpha c = Char.code c >= 97 && Char.code c <= 122
+let is_upper_alpha c = Char.code c >= 65 && Char.code c <= 90
+
+(* islower() *)
+let is_lower args =
+  match args with
+    [(Str s1)] ->
+      let all_lower = ref true in
+      String.iter (fun c -> if is_lower_alpha c then () else all_lower := false) s1;
+      Bool !all_lower
+  | _ -> raise (Built_in_error "Method expects exactly one string: IS_LOWER()")
+
 (* isupper() *)
 let is_upper args =
-  let is_upper_char c =
-    let lower = Char.lowercase_ascii c in
-    Char.code lower >= 97 && Char.code lower <= 122
-  in
   match args with
     [(Str s1)] ->
       let all_upper = ref true in
-      String.iter (fun c -> if is_upper_char c then () else all_upper := false) s1;
+      String.iter (fun c -> if is_upper_alpha c then () else all_upper := false) s1;
       Bool !all_upper
   | _ -> raise (Built_in_error "Method expects exactly one string: IS_UPPER()")
 
@@ -325,5 +333,6 @@ let table : (string, Py_val.t) Hashtbl.t =
 let str_methods : (string, Py_val.t) Hashtbl.t =
   let tbl = H.create 10 in
   H.add tbl "find" (Fun ("find", find));
+  H.add tbl "islower" (Fun ("islower", is_lower));
   H.add tbl "isupper" (Fun ("isupper", is_upper));
   tbl
