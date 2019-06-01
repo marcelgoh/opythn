@@ -292,6 +292,16 @@ let find args =
 let is_lower_alpha c = Char.code c >= 97 && Char.code c <= 122
 let is_upper_alpha c = Char.code c >= 65 && Char.code c <= 90
 
+(* isalpha() *)
+let is_alpha args =
+  match args with
+    [(Str s1)] ->
+      let all_alpha = ref true in
+      String.iter (fun c -> if is_lower_alpha (Char.lowercase_ascii c) then ()
+                            else all_alpha := false) s1;
+      Bool !all_alpha
+  | _ -> raise (Built_in_error "Method expects exactly one string: ISALPHA()")
+
 (* islower() *)
 let is_lower args =
   match args with
@@ -299,7 +309,7 @@ let is_lower args =
       let all_lower = ref true in
       String.iter (fun c -> if is_lower_alpha c then () else all_lower := false) s1;
       Bool !all_lower
-  | _ -> raise (Built_in_error "Method expects exactly one string: IS_LOWER()")
+  | _ -> raise (Built_in_error "Method expects exactly one string: ISLOWER()")
 
 (* isupper() *)
 let is_upper args =
@@ -308,7 +318,7 @@ let is_upper args =
       let all_upper = ref true in
       String.iter (fun c -> if is_upper_alpha c then () else all_upper := false) s1;
       Bool !all_upper
-  | _ -> raise (Built_in_error "Method expects exactly one string: IS_UPPER()")
+  | _ -> raise (Built_in_error "Method expects exactly one string: ISUPPER()")
 
 (* built-in scope *)
 let table : (string, Py_val.t) Hashtbl.t =
@@ -333,6 +343,7 @@ let table : (string, Py_val.t) Hashtbl.t =
 let str_methods : (string, Py_val.t) Hashtbl.t =
   let tbl = H.create 10 in
   H.add tbl "find" (Fun ("find", find));
+  H.add tbl "isalpha" (Fun ("isalpha", is_alpha));
   H.add tbl "islower" (Fun ("islower", is_lower));
   H.add tbl "isupper" (Fun ("isupper", is_upper));
   tbl
