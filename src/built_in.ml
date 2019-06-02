@@ -291,6 +291,7 @@ let find args =
 
 let is_lower_alpha c = Char.code c >= 97 && Char.code c <= 122
 let is_upper_alpha c = Char.code c >= 65 && Char.code c <= 90
+let is_numeric c = Char.code c >= 48 && Char.code c <= 57
 
 (* isalpha() *)
 let is_alpha args =
@@ -310,6 +311,15 @@ let is_lower args =
       String.iter (fun c -> if is_lower_alpha c then () else all_lower := false) s1;
       Bool !all_lower
   | _ -> raise (Built_in_error "Method expects exactly one string: ISLOWER()")
+
+(* isnumeric() *)
+let is_numeric args =
+  match args with
+    [(Str s1)] ->
+      let all_num = ref true in
+      String.iter (fun c -> if is_numeric c then () else all_num := false) s1;
+      Bool !all_num
+  | _ -> raise (Built_in_error "Method expects exactly one string: ISNUMERIC()")
 
 (* isupper() *)
 let is_upper args =
@@ -345,5 +355,6 @@ let str_methods : (string, Py_val.t) Hashtbl.t =
   H.add tbl "find" (Fun ("find", find));
   H.add tbl "isalpha" (Fun ("isalpha", is_alpha));
   H.add tbl "islower" (Fun ("islower", is_lower));
+  H.add tbl "isnumeric" (Fun ("isnumeric", is_numeric));
   H.add tbl "isupper" (Fun ("isupper", is_upper));
   tbl
