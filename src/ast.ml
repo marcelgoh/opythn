@@ -21,6 +21,10 @@ type expr =
 | Cond of expr * expr * expr (* ternary expression *)
 | Lambda of string list * expr    (* anonymous function *)
 | AttrRef of expr * string
+| Subscr of expr * expr * expr option
+| ListLit of expr list
+| DictLit of (expr * expr) list
+| TupleLit of expr list
 | None
 [@@deriving show]
 
@@ -29,6 +33,7 @@ type stmt =
 | Assign of expr * expr
 | If of expr * stmt list * ((stmt list) option)
 | While of expr * stmt list
+| For of expr * expr * stmt list
 | Funcdef of string * string list * stmt list
 | Global of string     (* one declaration at a time *)
 | Nonlocal of string

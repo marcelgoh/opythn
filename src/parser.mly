@@ -21,7 +21,7 @@
 (* keywords *)
 %token TRUE    %token FALSE  %token NONE
 %token IF      %token ELIF   %token ELSE
-%token WHILE   %token BREAK  %token CONTINUE
+%token WHILE   %token BREAK  %token CONTINUE %token FOR
 %token DEF     %token GLOBAL %token NONLOCAL %token RETURN %token LAMBDA
 %token CLASS   %token PASS
 (* word-like operators *)
@@ -33,8 +33,8 @@
 %token GEQ     %token BW_AND %token BW_OR %token BW_COMP
 %token BW_XOR  %token LSHIFT %token RSHIFT
 (* delimiters *)
-%token LPAREN   %token RPAREN(* %token LSQUARE  %token RSQUARE
-%token LCURLY   %token RCURLY *)%token DOT     %token COMMA
+%token LPAREN   %token RPAREN   %token LSQUARE  %token RSQUARE
+%token LCURLY   %token RCURLY   %token DOT      %token COMMA
 %token COLON    %token SEMIC    %token ASSIG    %token PLUS_A
 %token MINUS_A  %token TIMES_A  %token FP_DIV_A %token INT_DIV_A
 %token MOD_A    %token EXP_A    %token BW_AND_A %token BW_OR_A
@@ -56,7 +56,7 @@
 %left PLUS MINUS
 %left TIMES FP_DIV INT_DIV MOD
 %right EXP
-%left DOT
+%left DOT LSQUARE
 %left LPAREN
 
 (* type declarations *)
@@ -74,16 +74,21 @@
 %type <Ast.stmt> if_stmt
 %type <Ast.stmt> elif_stmt
 %type <Ast.stmt> while_stmt
+%type <Ast.stmt> for_stmt
 %type <Ast.stmt list> suite
 %type <Ast.stmt list list> deep_suite
+%type <Ast.expr> assig_target
 %type <Ast.stmt> assignment_stmt
 %type <Ast.stmt> expr_stmt
 %type <Ast.expr> assignable_expr
 %type <Ast.expr> cond_expr
 %type <Ast.op> comp_op
+%type <Ast.expr> slice
 %type <Ast.expr> expr
 %type <Ast.expr> attributeref
 %type <Ast.stmt> aug_assign
+%type <Ast.expr * Ast.expr> key_datum
+%type <(Ast.expr * Ast.expr) list> key_datum_list
 %type <Ast.expr> atom
 %type <Ast.expr> call
 %type <Ast.expr list> argument_list
@@ -135,6 +140,7 @@ pass_stmt:
 compound_stmt:
   s = if_stmt { s }
 | s = while_stmt { s }
+| s = for_stmt { s }
 | s = funcdef { s }
 | s = classdef { s }
 condition:
@@ -157,14 +163,21 @@ while_stmt:
   WHILE; cond = condition; COLON; pos = suite {
     While(cond, pos)
   }
+(* for loops can only have one iteration variable *)
+for_stmt:
+  FOR; s = ID; IN; iter = expr; COLON; pos = suite {
+    For(Var s, iter, pos)
+  }
 suite:
   ds = deep_suite { List.concat ds }
 deep_suite:
   s = simple_stmt; NEWLINE { [s] }
 | NEWLINE; INDENT; ss = stmt+; DEDENT { ss }
+assig_target:
+  s = ID { Var s }
+| a = attributeref { a }
 assignment_stmt:
-  s = ID; ASSIG; e = assignable_expr { Assign(Var s, e) }
-| target = attributeref; ASSIG; e = assignable_expr { Assign(target, e) }
+| target = assig_target; ASSIG; e = assignable_expr { Assign(target, e) }
 
 (* EXPRESSIONS *)
 expr_stmt:
@@ -183,6 +196,8 @@ comp_op:
   LT { Lt }   | GT { Gt }   | EQ { Eq } | LEQ { Leq }
 | GEQ { Geq } | NEQ { Neq } | IN { In } | NOT_IN { NotIn }
 | IS { Is }   | IS_NOT { IsNot }
+slice:
+  COLON; e = expr { e }
 expr:
   a = atom { a }
 | c = call { c }
@@ -213,6 +228,11 @@ expr:
 | LAMBDA; args = param_id_list; COLON; body = expr {
     Lambda(args, body)
   } %prec LAMBDA
+(* subscription and slicing *)
+| e1 = expr; LSQUARE; e2 = expr; sl = slice?; RSQUARE {
+    Subscr(e1, e2, sl)
+  }
+
 (* attribute reference *)
 attributeref:
   e1 = expr; DOT; a = ID { AttrRef(e1, a) }
@@ -229,6 +249,12 @@ aug_assign:
 | v = ID; INT_DIV_A; e = expr { Assign(Var v, Op(IntDiv, [Var v; e])) }
 | v = ID; MOD_A; e = expr { Assign(Var v, Op(Mod, [Var v; e])) }
 | v = ID; EXP_A; e = expr { Assign(Var v, Op(Exp, [Var v; e])) }
+(* dict elements *)
+key_datum:
+  e1 = expr; COLON; e2 = expr { (e1, e2) }
+key_datum_list:
+  kv = key_datum { [kv] }
+| kv = key_datum; COMMA; rest = key_datum_list { kv :: rest }
 atom:
   v = ID { Var v }
 | i = INT { IntLit i }
@@ -237,6 +263,21 @@ atom:
 | TRUE { BoolLit true }
 | FALSE { BoolLit false }
 | NONE { None }
+(* empty tuple *)
+| LPAREN; RPAREN { TupleLit [] }
+(* literal lists *)
+| LSQUARE; args = argument_list?; RSQUARE {
+    match args with
+      Some items -> ListLit items
+    | None -> ListLit []
+  }
+(* literal dicts *)
+| LCURLY; pairs = key_datum_list?; RCURLY {
+    match pairs with
+      Some l -> DictLit l
+    | None -> DictLit []
+  }
+
 call:
   e = expr; LPAREN; args = argument_list?; RPAREN {
     match args with

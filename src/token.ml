@@ -6,7 +6,7 @@ type token =
 (* keywords *)
 | TRUE  | FALSE  | NONE
 | IF    | ELIF   | ELSE
-| WHILE | BREAK  | CONTINUE
+| WHILE | BREAK  | CONTINUE | FOR
 | DEF   | GLOBAL | NONLOCAL | RETURN | LAMBDA
 | CLASS | PASS
 (* word-like operators *)
