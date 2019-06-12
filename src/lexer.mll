@@ -99,7 +99,7 @@
   let last_token_was_newline = ref true
 }
 
-let integer = '-'? ['1'-'9'] ['0'-'9']* | '-'? '0'*
+let integer = ['1'-'9'] ['0'-'9']* | '-'? '0'*
 let pointfloat = '-'? ['0'-'9']* '.' ['0'-'9']* | ['0'-'9']+ '.'
 let whitespace = [' ' '\t']+
 let newline = [' ' '\t']* ['\r' '\n']

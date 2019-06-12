@@ -95,12 +95,20 @@ let str_of_instr instr =
     | STORE_GLOBAL s         -> sprintf "STORE_GLOBAL\t\t\"%s\"" s
     | STORE_NAME s           -> sprintf "STORE_NAME\t\t\"%s\"" s
     | STORE_ATTR s           -> sprintf "STORE_ATTR\t\t\"%s\"" s
+    | DELETE_LOCAL(i, s)     -> sprintf "DELETE_LOCAL\t\t%d \"%s\"" i s
+    | DELETE_GLOBAL s        -> sprintf "DELETE_GLOBAL\t\t\"%s\"" s
+    | DELETE_NAME s          -> sprintf "DELETE_NAME\t\t\"%s\"" s
+    | DELETE_ATTR s          -> sprintf "DELETE_ATTR\t\t\"%s\"" s
     | LOAD_CONST pv          -> sprintf "LOAD_CONST\t\t%s" (Py_val.str_of_py_val pv)
     | LOAD_LOCAL(i, s)       -> sprintf "LOAD_LOCAL\t\t%d \"%s\"" i s
     | LOAD_GLOBAL s          -> sprintf "LOAD_GLOBAL\t\t\"%s\"" s
     | LOAD_NAME s            -> sprintf "LOAD_NAME\t\t\"%s\"" s
     | LOAD_ATTR s            -> sprintf "LOAD_ATTR\t\t\"%s\"" s
     | JUMP i                 -> sprintf "JUMP\t\t\t%d" i
+    | FOR_ITER i             -> sprintf "FOR_ITER\t\t%d" i
+    | BUILD_TUPLE i          -> sprintf "BUILD_TUPLE\t\t%d" i
+    | BUILD_LIST i           -> sprintf "BUILD_LIST\t\t%d" i
+    | BUILD_DICT i           -> sprintf "BUILD_DICT\t\t%d" i
     | POP_JUMP_IF_FALSE i    -> sprintf "POP_JUMP_IF_FALSE\t%d" i
     | JUMP_IF_TRUE_OR_POP i  -> sprintf "JUMP_IF_TRUE_OR_POP\t%d" i
     | JUMP_IF_FALSE_OR_POP i -> sprintf "JUMP_IF_FALSE_OR_POP\t%d" i

@@ -385,10 +385,56 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
                        s_push (Fun (method_name, (create_method f (Str s))))
                    | _ ->
                        raise (Runtime_error
-                                (sprintf "Str object has no attribute `%s`: LOAD_ATTR()" id)))
+                                (sprintf "Str object has no attribute `%s`: LOAD_ATTR" id)))
               | _ -> raise (Runtime_error
                               (sprintf "Object has no attribute `%s`: LOAD_ATTR" id))
              );
+         | BUILD_SEQ ->
+             (try s_push (Seq (as_seq (S.pop stack)))
+              with Type_error ->
+                raise (Runtime_error "Failed to build sequence: BUILD_SEQ"))
+         | FOR_ITER idx ->
+             let tos = S.pop stack in
+             (match tos with
+                Seq s ->
+                  (match s () with
+                     Seq.Nil -> next := idx  (* end of sequence, jump forward *)
+                   | Seq.Cons(pv, rest) ->
+                       s_push (Seq rest);    (* push rest of sequence for next iteration *)
+                       s_push pv)            (* this value will be assigned to iter var *)
+              | _ ->
+                  printf "%s\n" (str_of_py_val tos);
+                  raise (Runtime_error "Failed to get next value: FOR_ITER"))
+         | BUILD_TUPLE n ->
+             let arr = Array.make n None in
+             for i = 0 to n - 1 do
+               (* populate array in reverse *)
+               arr.(n - 1) <- S.pop stack
+             done;
+             s_push (Tuple arr)
+         | BUILD_LIST n ->
+             let darr = D.create () in
+             for _ = 0 to n - 1 do
+               (* build array in reverse *)
+               D.insert darr 0 (S.pop stack)
+             done;
+             s_push (List darr)
+         | BUILD_DICT n ->
+             let tbl = H.create n in
+             for _ = 0 to n - 1 do
+               let v = S.pop stack in
+               let k = S.pop stack in
+               H.add tbl k v
+             done;
+             s_push (Dict tbl)
+         | SUBSCR
+         | SLICESUB
+         | DELETE_LOCAL _ (* (n, id) *)
+         | DELETE_GLOBAL _ (* id *)
+         | DELETE_NAME _ (* id *)
+         | DELETE_ATTR _ (* id *)
+         | DELETE_SUBSCR
+         | DELETE_SLICESUB -> ()
         );
         idx := !next
       done;

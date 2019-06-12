@@ -51,10 +51,10 @@
 %left BW_OR
 %left BW_XOR
 %left BW_AND
-%nonassoc BW_COMP
 %left LSHIFT RSHIFT
 %left PLUS MINUS
 %left TIMES FP_DIV INT_DIV MOD
+%left BW_COMP
 %right EXP
 %left DOT LSQUARE
 %left LPAREN
@@ -218,7 +218,7 @@ expr:
 | e1 = expr; INT_DIV; e2 = expr { Op(IntDiv, [e1; e2]) }
 | e1 = expr; MOD; e2 = expr { Op(Mod, [e1; e2]) }
 | e1 = expr; EXP; e2 = expr { Op(Exp, [e1; e2]) }
-| MINUS; e = expr { Op(Neg, [e]) }
+| MINUS; e = expr { Op(Neg, [e]) } %prec BW_COMP
 | BW_COMP; e = expr { Op(BwComp, [e]) }
 (* tests *)
 | e1 = expr; OR; e2 = expr { Op(Or, [e1; e2]) }

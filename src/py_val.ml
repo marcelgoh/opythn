@@ -2,17 +2,21 @@
 
 exception Type_error
 
+module D = DynArray
+module H = Hashtbl
+module S = Seq
+
 type cls = {
   name : string;
   super : cls option;
-  attrs : (string, t) Hashtbl.t;
+  attrs : (string, t) H.t;
   [@opaque]
 }
 [@@deriving show]
 (* making obj its own type to appease ppx_deriving *)
 and obj = {
   cls : cls;
-  fields : (string, t) Hashtbl.t;
+  fields : (string, t) H.t;
   [@opaque]
 }
 [@@deriving show]
@@ -25,6 +29,10 @@ and t =
 | Obj of obj
 | Class of cls
 | Type of string
+| List of (t D.t [@opaque])
+| Tuple of t array
+| Dict of ((t, t) H.t [@opaque])
+| Seq of (t S.t [@opaque])
 | None
 [@@deriving show]
 
@@ -33,7 +41,7 @@ let str_of_py_val pv =
 
 (* get an attribute from a class *)
 let rec get_attr_opt cls id =
-  match Hashtbl.find_opt cls.attrs id with
+  match H.find_opt cls.attrs id with
     Some pval -> Some pval
   | None ->
       (match cls.super with
@@ -43,7 +51,7 @@ let rec get_attr_opt cls id =
 
 (* get an object's field *)
 let get_field_opt obj id =
-  match Hashtbl.find_opt obj.fields id with
+  match H.find_opt obj.fields id with
     Some pval -> Some pval
   | None -> get_attr_opt obj.cls id
 
@@ -70,6 +78,16 @@ let as_float = function
 | Bool b  -> if b then 1.0 else 0.0
 | Str _ | Fun _ | Obj _ | Class _ | Type _ | None ->
     raise Type_error
+
+let as_seq = function
+  List darr -> Array.to_seq (D.to_array darr)
+| Tuple arr -> Array.to_seq arr
+| Dict htbl -> H.to_seq_keys htbl
+| Str s ->
+    let char_seq = String.to_seq s in
+    Seq.map (fun c -> (Str (String.make 1 c))) char_seq
+| Seq s -> s
+| _ -> raise Type_error
 
 let is_float = function
   Float _ -> true

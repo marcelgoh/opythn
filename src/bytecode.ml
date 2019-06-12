@@ -336,26 +336,25 @@ let rec compile_stmts in_repl in_class stmts enclosings table =
   (* convert a statement to bytecode and append instructions to instruction array *)
   let rec compile_stmt (in_loop : bool) (s : Ast.stmt) : unit =
     let compile_and_add_expr expr = D.append (compile_expr [] expr) instrs in
-    let compile_id id =
+    let get_store_instr id : Instr.t =
       if in_class then
-        D.add instrs (STORE_NAME id)
+        STORE_NAME id
       else
-        let instr : Instr.t =
-          (match check_tables_opt id with
-             Some (Local n) -> (STORE_LOCAL(n, id))
-           | Some Global
-           | Some Referred  -> (STORE_GLOBAL id)
-           | None -> raise (Bytecode_error (sprintf "Variable `%s`'s scope not resolved: COMPILE_ID" id)))
-        in
-        D.add instrs instr
+        match check_tables_opt id with
+          Some (Local n) -> (STORE_LOCAL(n, id))
+        | Some Global
+        | Some Referred  -> (STORE_GLOBAL id)
+        | None -> raise (Bytecode_error (sprintf "Variable `%s`'s scope not resolved: GET_STORE_INSTR" id))
     in
-    let compile_loop start_idx pop_idx stmts (for_loop : bool) =
+    let compile_loop start_idx pop_idx stmts for_var =
+      if for_var <> "" then D.add instrs (get_store_instr for_var) else ();
       List.iter (compile_stmt true) stmts;
       D.add instrs (JUMP start_idx); (* goto beginning of loop *)
       let end_idx = D.length instrs in
       (* backfill dummy address *)
-      if for_loop then
-        D.set instrs pop_idx (FOR_ITER end_idx)
+      if for_var <> "" then (
+        D.set instrs pop_idx (FOR_ITER end_idx);
+      )
       else
         D.set instrs pop_idx (POP_JUMP_IF_FALSE end_idx);
       (* scan over tokens that were added to backfill breaks and continues *)
@@ -368,7 +367,9 @@ let rec compile_stmts in_repl in_class stmts enclosings table =
     in
     (match s with
        Expr e -> compile_and_add_expr e;
-     | Assign (Var id, e) -> compile_and_add_expr e; compile_id id
+     | Assign (Var id, e) ->
+         compile_and_add_expr e;
+         D.add instrs (get_store_instr id)
      | Assign (AttrRef(obj, id), e) ->
          compile_and_add_expr e;
          compile_and_add_expr obj;
@@ -394,13 +395,13 @@ let rec compile_stmts in_repl in_class stmts enclosings table =
          compile_and_add_expr c;
          let pop_idx = D.length instrs in
          D.add instrs (POP_JUMP_IF_FALSE (-1)); (* dummy *)
-         compile_loop start_idx pop_idx ss false
+         compile_loop start_idx pop_idx ss ""
      | For (Var id, seq, ss) ->
          compile_and_add_expr seq;
          D.add instrs BUILD_SEQ;
          let start_idx = D.length instrs in
          D.add instrs (FOR_ITER (-1));  (* dummy *)
-         compile_loop start_idx start_idx ss true (* start and pop indices are the same *)
+         compile_loop start_idx start_idx ss id (* start and pop indices are the same *)
      | For _ ->
          raise (Bytecode_error "Cannot use provided iteration variable in for loop.")
      | Funcdef (name, args, body) ->
@@ -409,7 +410,7 @@ let rec compile_stmts in_repl in_class stmts enclosings table =
          let code_block : code = compile_stmts in_repl false body (table::enclosings) new_table in
          D.add instrs (MAKE_FUNCTION (args, { name = name;
                                               ptr = ref code_block }));
-         compile_id name
+         D.add instrs (get_store_instr name)
      | Return e ->
          compile_and_add_expr e;
          D.add instrs RETURN_VALUE
@@ -452,7 +453,7 @@ let rec compile_stmts in_repl in_class stmts enclosings table =
          in
          D.add instrs (MAKE_CLASS (num_supers,
                                    { name = name; ptr = ref code_block }));
-         compile_id name
+         D.add instrs (get_store_instr name)
      | Global _ | Nonlocal _ | Pass -> ()
     )
   in
