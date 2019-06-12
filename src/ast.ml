@@ -7,7 +7,7 @@ type op =
 | Neq    | Lt     | Gt     | Leq
 | Geq    | BwAnd  | BwOr   | BwComp
 | BwXor  | LShift | RShift | Neg
-[@@deriving show]
+[@@deriving show {with_path = false}]
 
 type expr =
   Var of string
@@ -27,7 +27,7 @@ type expr =
 | DictLit of (expr * expr) list
 | TupleLit of expr list
 | None
-[@@deriving show]
+[@@deriving show {with_path = false}]
 
 type stmt =
   Expr of expr
@@ -44,11 +44,9 @@ type stmt =
 | Pass
 | Break
 | Continue
-[@@deriving show]
+[@@deriving show {with_path = false}]
 
 type program = stmt list
-[@@deriving show]
+[@@deriving show {with_path = false}]
 
-let show prog =
-  let module S = Str in
-  S.global_replace (S.regexp_string "Ast.") "" (show_program prog)
+let show = show_program

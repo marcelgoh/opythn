@@ -26,14 +26,12 @@ type token =
 | BW_XOR_A | LSHIFT_A | RSHIFT_A
 (* pseudo start-symbols *)
 | START_FILE | START_REPL
-[@@deriving show]
+[@@deriving show {with_path = false}]
 
 let show tok =
   let module S = Str in
-  let str =
-    match tok with
-      START_FILE | START_REPL | NEWLINE | EOF ->
-        (show_token tok) ^ "\n"
-    | _ ->
-        (show_token tok) ^ " " in
-  S.global_replace (S.regexp_string "Token.") "" str
+  match tok with
+    START_FILE | START_REPL | NEWLINE | EOF ->
+      (show_token tok) ^ "\n"
+  | _ ->
+      (show_token tok) ^ " "

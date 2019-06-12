@@ -12,14 +12,14 @@ type cls = {
   attrs : (string, t) H.t;
   [@opaque]
 }
-[@@deriving show]
+[@@deriving show {with_path = false}]
 (* making obj its own type to appease ppx_deriving *)
 and obj = {
   cls : cls;
   fields : (string, t) H.t;
   [@opaque]
 }
-[@@deriving show]
+[@@deriving show {with_path = false}]
 and t =
   Int of int
 | Float of float
@@ -34,10 +34,9 @@ and t =
 | Dict of ((t, t) H.t [@opaque])
 | Seq of (t S.t [@opaque])
 | None
-[@@deriving show]
+[@@deriving show {with_path = false}]
 
-let str_of_py_val pv =
-  Str.global_replace (Str.regexp_string "Py_val.") "" (show pv)
+let str_of_py_val pv = show pv
 
 (* get an attribute from a class *)
 let rec get_attr_opt cls id =
