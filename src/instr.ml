@@ -52,6 +52,24 @@ type t =
 | CALL_FUNCTION of (* argc : *) int
 | MAKE_FUNCTION of (* args : *) string list * (* block : *) t block
 | MAKE_CLASS of (* number of superclasses : *) int * (* block : *) t block
+(* for loops *)
+| BUILD_SEQ   (* TOS <- seq(TOS) *)
+| FOR_ITER of (* exit address : *) int
+(* sequence builders *)
+| BUILD_TUPLE of (* number of elements : *) int
+| BUILD_LIST of (* number of elements : *) int
+| BUILD_DICT of (* number of pairs : *) int
+(* TOS <- TOS1[TOS] *)
+| SUBSCR
+(* TOS <- TOS2[TOS1:TOS] *)
+| SLICESUB
+(* delete operations *)
+| DELETE_LOCAL of (* depth : *) int * (* name : *) string
+| DELETE_GLOBAL of (* name : *) string
+| DELETE_NAME of (* name : *) string
+| DELETE_ATTR of (* name : *) string
+| DELETE_SUBSCR
+| DELETE_SLICESUB
 [@@deriving show]
 
 let address_of_ptr ptr = 2*(Obj.magic ptr)

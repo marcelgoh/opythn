@@ -33,7 +33,7 @@
                 "if", IF;         "elif", ELIF;     "else", ELSE;
                 "while", WHILE;   "break", BREAK;   "continue", CONTINUE;
                 "def", DEF;       "global", GLOBAL; "nonlocal", NONLOCAL;
-                "return", RETURN; "lambda", LAMBDA;
+                "return", RETURN; "lambda", LAMBDA; "del", DEL;
                 "class", CLASS;   "pass", PASS]
 
   (* returns number of spaces, where a tab counts as 4 spaces *)

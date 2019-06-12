@@ -21,7 +21,7 @@
 (* keywords *)
 %token TRUE    %token FALSE  %token NONE
 %token IF      %token ELIF   %token ELSE
-%token WHILE   %token BREAK  %token CONTINUE %token FOR
+%token WHILE   %token BREAK  %token CONTINUE %token FOR    %token DEL
 %token DEF     %token GLOBAL %token NONLOCAL %token RETURN %token LAMBDA
 %token CLASS   %token PASS
 (* word-like operators *)
@@ -95,6 +95,7 @@
 %type <Ast.expr list> argument_list
 %type <string list> param_id_list
 %type <Ast.stmt> funcdef
+%type <Ast.stmt> del_stmt
 %type <Ast.stmt> return_stmt
 %type <Ast.stmt> global_stmt
 %type <Ast.stmt> nonlocal_stmt
@@ -131,6 +132,7 @@ small_stmt:
 | s = global_stmt { s }
 | s = nonlocal_stmt { s }
 | s = pass_stmt { s }
+| s = del_stmt { s }
 flow_stmt:
   BREAK { Break }
 | CONTINUE { Continue }
@@ -309,6 +311,8 @@ funcdef:
       Some a -> Funcdef(name, a, body)
     | None   -> Funcdef(name, [], body)
   }
+del_stmt:
+  DEL; e = expr { Del e }
 return_stmt:
   RETURN; e = expr { Return e }
 global_stmt:

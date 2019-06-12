@@ -71,9 +71,6 @@ let rec compile_stmts in_repl in_class stmts enclosings table =
       Var s -> (match check_tables_opt s with
                   Some _ -> ()
                 | None -> H.replace table s Referred)
-(*                     (match search_upwards 1 enclosings s with *)
-(*                              Some n -> H.replace table s (Local n) *)
-(*                            | None -> H.replace table s Referred)) *)
     | Call(f ,es) -> resolve_expr f;
                      List.iter resolve_expr es
     | Op(_, e) -> List.iter resolve_expr e
@@ -81,6 +78,14 @@ let rec compile_stmts in_repl in_class stmts enclosings table =
                          resolve_expr c;
                          resolve_expr e2
     | AttrRef(obj, _) -> resolve_expr obj
+    | Subscr(seq, i, slice) ->
+        (match slice with
+           Some j -> resolve_expr j
+         | None -> ()
+        );
+        resolve_expr i;
+        resolve_expr seq;
+    | ListLit _ | DictLit _ | TupleLit _
     | IntLit _ | FloatLit _ | BoolLit _ | StrLit _ | Lambda(_, _) | None -> ()
   in
 
@@ -126,6 +131,10 @@ let rec compile_stmts in_repl in_class stmts enclosings table =
          | While(c, s) ->
              resolve_expr c;
              resolve_stmts s
+         | For(id, seq, s) ->
+             resolve_expr id;
+             resolve_expr seq;
+             resolve_stmts s
          | Global s ->
              if in_class then
                H.replace class_vars s Global
@@ -160,6 +169,7 @@ let rec compile_stmts in_repl in_class stmts enclosings table =
                        | None ->
                            raise (Bytecode_error (sprintf "No binding for %s found" s))))
          | Return e -> resolve_expr e
+         | Del e -> resolve_expr e
          (* we don't resolve inside function or class declarations *)
          | Funcdef(name, _, _) ->
              add_name name
@@ -216,7 +226,6 @@ let rec compile_stmts in_repl in_class stmts enclosings table =
     else
       search
   in
-
   (* convert an expression to bytecode and add instructions to array *)
   let rec compile_expr (lambdas : string list list) (e : Ast.expr) : code =
     (* local instruction array for compiling expressions *)
@@ -302,6 +311,23 @@ let rec compile_stmts in_repl in_class stmts enclosings table =
      | AttrRef(e, id) ->
          compile_and_add_expr e;
          D.add expr_instrs (LOAD_ATTR id)
+     | Subscr(seq, i, slice) ->
+         compile_and_add_expr seq;
+         compile_and_add_expr i;
+         (match slice with
+            Some j ->
+              compile_and_add_expr j;
+              D.add expr_instrs SLICESUB
+          | None -> D.add expr_instrs SUBSCR)
+     | ListLit elems ->
+         List.iter (fun e -> compile_and_add_expr e) elems;
+         D.add expr_instrs (BUILD_LIST (List.length elems))
+     | TupleLit elems ->
+         List.iter (fun e -> compile_and_add_expr e) elems;
+         D.add expr_instrs (BUILD_TUPLE (List.length elems))
+     | DictLit elems ->
+         List.iter (fun (k,v) -> compile_and_add_expr k; compile_and_add_expr v) elems;
+         D.add expr_instrs (BUILD_DICT (List.length elems))
      | None -> D.add expr_instrs (LOAD_CONST None)
     );
     expr_instrs
@@ -322,6 +348,23 @@ let rec compile_stmts in_repl in_class stmts enclosings table =
            | None -> raise (Bytecode_error (sprintf "Variable `%s`'s scope not resolved: COMPILE_ID" id)))
         in
         D.add instrs instr
+    in
+    let compile_loop start_idx pop_idx stmts (for_loop : bool) =
+      List.iter (compile_stmt true) stmts;
+      D.add instrs (JUMP start_idx); (* goto beginning of loop *)
+      let end_idx = D.length instrs in
+      (* backfill dummy address *)
+      if for_loop then
+        D.set instrs pop_idx (FOR_ITER end_idx)
+      else
+        D.set instrs pop_idx (POP_JUMP_IF_FALSE end_idx);
+      (* scan over tokens that were added to backfill breaks and continues *)
+      for i = start_idx to end_idx - 1 do
+        match D.get instrs i with
+          JUMP t -> if t = -10 then D.set instrs i (JUMP end_idx) else
+                    if t = -20 then D.set instrs i (JUMP start_idx) else ()
+        | _ -> ()
+      done
     in
     (match s with
        Expr e -> compile_and_add_expr e;
@@ -349,19 +392,17 @@ let rec compile_stmts in_repl in_class stmts enclosings table =
      | While (c, ss) ->
          let start_idx = D.length instrs in
          compile_and_add_expr c;
-         let pop_index = D.length instrs in
+         let pop_idx = D.length instrs in
          D.add instrs (POP_JUMP_IF_FALSE (-1)); (* dummy *)
-         List.iter (compile_stmt true) ss;
-         D.add instrs (JUMP start_idx); (* goto beginning of loop *)
-         let end_idx = D.length instrs in
-         D.set instrs pop_index (POP_JUMP_IF_FALSE end_idx); (* backfill *)
-         (* scan over tokens that were added to backfill breaks and continues *)
-         for i = start_idx to end_idx - 1 do
-           match D.get instrs i with
-             JUMP t -> if t = -10 then D.set instrs i (JUMP end_idx) else
-                       if t = -20 then D.set instrs i (JUMP start_idx) else ()
-           | _ -> ()
-         done
+         compile_loop start_idx pop_idx ss false
+     | For (Var id, seq, ss) ->
+         compile_and_add_expr seq;
+         D.add instrs BUILD_SEQ;
+         let start_idx = D.length instrs in
+         D.add instrs (FOR_ITER (-1));  (* dummy *)
+         compile_loop start_idx start_idx ss true (* start and pop indices are the same *)
+     | For _ ->
+         raise (Bytecode_error "Cannot use provided iteration variable in for loop.")
      | Funcdef (name, args, body) ->
          let new_table = H.create 10 in
          List.iter (fun s -> H.replace new_table s (Local 0)) args;
@@ -372,6 +413,24 @@ let rec compile_stmts in_repl in_class stmts enclosings table =
      | Return e ->
          compile_and_add_expr e;
          D.add instrs RETURN_VALUE
+     | Del (Var id) ->
+         (match get_load_instr [] (* not in lambda *) id with
+            LOAD_LOCAL (n, id) -> D.add instrs (DELETE_LOCAL (n, id))
+          | LOAD_GLOBAL id -> D.add instrs (DELETE_GLOBAL id)
+          | LOAD_NAME id -> D.add instrs (DELETE_NAME id)
+          | _ -> raise (Bytecode_error "Could not generate delete instruction"))
+     | Del (Subscr(seq, i, slice)) ->
+         compile_and_add_expr seq;
+         compile_and_add_expr i;
+         (match slice with
+            Some j ->
+              compile_and_add_expr j;
+              D.add instrs SLICESUB
+          | None -> D.add instrs SUBSCR)
+     | Del (AttrRef(obj, id)) ->
+         compile_and_add_expr obj;
+         D.add instrs (DELETE_ATTR id)
+     | Del _ -> raise (Bytecode_error "Cannot delete object.")
      | Break ->
          if not in_loop then
            raise (Bytecode_error "BREAK statement found outside loop.")

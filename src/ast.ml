@@ -21,6 +21,7 @@ type expr =
 | Cond of expr * expr * expr (* ternary expression *)
 | Lambda of string list * expr    (* anonymous function *)
 | AttrRef of expr * string
+(* sequence[index : slice option] *)
 | Subscr of expr * expr * expr option
 | ListLit of expr list
 | DictLit of (expr * expr) list
@@ -38,6 +39,7 @@ type stmt =
 | Global of string     (* one declaration at a time *)
 | Nonlocal of string
 | Return of expr       (* return only one expression *)
+| Del of expr          (* delete only one expression *)
 | Classdef of string * string option * stmt list
 | Pass
 | Break
