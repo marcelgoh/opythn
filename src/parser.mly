@@ -89,6 +89,7 @@
 %type <Ast.stmt> aug_assign
 %type <Ast.expr * Ast.expr> key_datum
 %type <(Ast.expr * Ast.expr) list> key_datum_list
+(* %type <Ast.expr list> tuple_list *)
 %type <Ast.expr> atom
 %type <Ast.expr> call
 %type <Ast.expr list> argument_list
@@ -255,6 +256,12 @@ key_datum:
 key_datum_list:
   kv = key_datum { [kv] }
 | kv = key_datum; COMMA; rest = key_datum_list { kv :: rest }
+(* two or more comma-separated values *)
+(*
+tuple_list:
+  e1 = expr; COMMA; e2 = expr { [e1; e2] }
+| e1 = expr; COMMA; tl = tuple_list { e1 :: tl }
+*)
 atom:
   v = ID { Var v }
 | i = INT { IntLit i }
@@ -263,8 +270,12 @@ atom:
 | TRUE { BoolLit true }
 | FALSE { BoolLit false }
 | NONE { None }
-(* empty tuple *)
+(* tuples *)
+(*
 | LPAREN; RPAREN { TupleLit [] }
+| LPAREN; e = expr; COMMA; RPAREN { TupleLit [e] }
+| tl = tuple_list { TupleLit tl }
+*)
 (* literal lists *)
 | LSQUARE; args = argument_list?; RSQUARE {
     match args with

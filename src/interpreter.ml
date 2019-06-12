@@ -18,42 +18,6 @@ type env = {
   globals : scope list;
 }
 
-(* type conversion functions *)
-let as_bool = function
-  Int i  -> i <> 0
-| Bool b -> b
-| Float f -> f <> 0.0
-| Str s -> s <> ""
-| Fun (_, _) -> true
-| Obj _ | Class _ | Type _
-| None -> false
-
-let as_int = function
-  Int i  -> i
-| Bool b -> if b then 1 else 0
-| Float _ | Str _ | Fun _
-| Obj _ | Class _ | Type _ | None ->
-    raise Type_error
-
-let as_float = function
-  Int i   -> float_of_int i
-| Float f -> f
-| Bool b  -> if b then 1.0 else 0.0
-| Str _ | Fun _ | Obj _ | Class _ | Type _ | None ->
-    raise Type_error
-
-let is_float = function
-  Float _ -> true
-| _       -> false
-
-let is_int = function
-  Int _ -> true
-| _     -> false
-
-let is_str = function
-  Str _ -> true
-| _     -> false
-
 (* python modulo operator *)
 let rec int_exp x n =
   if n = 0 then 1
@@ -61,46 +25,6 @@ let rec int_exp x n =
     let x' = int_exp x (n / 2) in
     if n mod 2 = 0 then x' * x'
     else x * x' * x'
-
-(* comparison functions -- TODO: make these better/work with objects *)
-let eq pv1 pv2 = (* uses OCaml's structural equality *)
-  if is_float pv1 || is_float pv2 then
-    as_float pv1 = as_float pv2
-  else if is_int pv1 || is_int pv2 then
-         as_int pv1 = as_int pv2
-       else
-         match (pv1, pv2) with
-           (Str s1, Str s2) -> s1 = s2
-         | (None, None) -> true
-         | _ -> raise Type_error
-
-let is pv1 pv2 = (* uses OCaml's physical equality *)
-  if is_float pv1 || is_float pv2 then
-    as_float pv1 == as_float pv2
-  else if is_int pv1 || is_int pv2 then
-         as_int pv1 == as_int pv2
-       else
-         match (pv1, pv2) with
-           (Str s1, Str s2) -> s1 == s2
-         | (None, None) -> true
-         | _ -> raise Type_error
-
-let lt pv1 pv2 = (* uses OCaml's structural comparison *)
-  if is_float pv1 || is_float pv2 then
-    as_float pv1 < as_float pv2
-  else if is_int pv1 || is_int pv2 then
-         as_int pv1 < as_int pv2
-       else
-         match (pv1, pv2) with
-           (Str s1, Str s2) -> s1 < s2
-         | (None, None) -> true
-         | _ -> raise Type_error
-
-let py_in pv1 pv2 =
-  match pv2 with
-    Int _ | Float _ | Bool _ | Str _ | Fun _
-  | Obj _ | Class _ | Type _ | None ->
-      raise Type_error (* not iterable *)
 
 (* environment functions *)
 let rec lookup_scope_list s_list id =
@@ -135,15 +59,13 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
       exception Exit of Py_val.t
     end
   in
-  (* loop over instructions *)
-  let rec loop idx =
+  (* loop over instructions -- changed to a while-loop because OCaml couldn't perform TCO *)
+  let loop () : Py_val.t =
+    let idx = ref 0 in
     try (
-      if idx >= D.length c then
-        (* default behaviour when no RETURN_VALUE is encountered is to return TOS *)
-        if S.is_empty stack then Py_val.None else S.pop stack
-      else
-        let next = ref (idx + 1) in
-        (match D.get c idx with
+      while !idx < D.length c do
+        let next = ref (!idx + 1) in
+        (match D.get c !idx with
            NOP -> ()
          | POP_TOP -> S.pop stack |> ignore
          | UNARY_NEG ->
@@ -464,17 +386,19 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
                    | _ ->
                        raise (Runtime_error
                                 (sprintf "Str object has no attribute `%s`: LOAD_ATTR()" id)))
-
               | _ -> raise (Runtime_error
                               (sprintf "Object has no attribute `%s`: LOAD_ATTR" id))
              );
         );
-      loop !next
+        idx := !next
+      done;
+      (* default behaviour when no RETURN_VALUE is encountered is to return TOS *)
+      if S.is_empty stack then Py_val.None else S.pop stack
     )
     with Loop.Exit pv -> pv
   in
   (* start interpreting from the top of instructions *)
-  loop 0
+  loop ()
 
 (* interpret bytecode instructions, printing result when appropriate *)
 let interpret c envr =
