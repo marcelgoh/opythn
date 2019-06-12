@@ -128,7 +128,11 @@ let rec eq pv1 pv2 = (* uses OCaml's structural equality, usually *)
          | (Tuple x1, Tuple x2) -> x1 = x2
          | (Fun (s1, f1), Fun (s2, f2)) -> s1 = s2 && f1 == f2
          (* change this when __eq()__ added *)
-         | (Obj x1, Obj x2) -> x1 == x2
+         | (Obj x1, Obj x2) ->
+             (match H.find_opt x1.cls.attrs "__eq__" with
+                Some (Fun (_, f)) ->
+                  as_bool (f [Obj x1; Obj x2])
+              | _ -> false)
          | (Class x1, Class x2) -> x1 == x2
          (* might be sketchy, not quite what Python does *)
          | (Seq x1, Seq x2) -> x1 == x2

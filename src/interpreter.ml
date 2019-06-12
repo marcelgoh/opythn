@@ -403,7 +403,6 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
                        s_push (Seq rest);    (* push rest of sequence for next iteration *)
                        s_push pv)            (* this value will be assigned to iter var *)
               | _ ->
-                  printf "%s\n" (str_of_py_val tos);
                   raise (Runtime_error "Failed to get next value: FOR_ITER"))
          | BUILD_TUPLE n ->
              let arr = Array.make n None in

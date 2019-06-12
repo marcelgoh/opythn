@@ -55,3 +55,15 @@ def foo():
 
 foo()
 
+class One():
+    def __init__(self):
+        self.x = 4
+    def __eq__(self, other):
+        return isinstance(other, One) and self.x == other.x
+
+o1 = One()
+o2 = One()
+o1 == o2  # shouldn't print anything
+print(o1 == o2)
+o1.x = 23
+print(o1 == o2)
