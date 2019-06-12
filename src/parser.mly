@@ -1,7 +1,7 @@
 (* Parser generator for OPythn, for use with menhir *)
 
 %{
-  exception Parse_error of string
+  module P = Parse_errors
 
   (* build right-leaning tree of IFs from ELIFs *)
   let rec build_if_tree (cond : Ast.expr) (pos : Ast.stmt list) (elifs : Ast.stmt list)
@@ -9,7 +9,7 @@
     match elifs with
       []                  -> If(cond, pos, neg)
     | (If(c, p, _)::rest) -> If(cond, pos, Some([(build_if_tree c p rest neg)]))
-    | (_::rest)           -> raise (Parse_error "Error parsing if-expressions.")
+    | (_::rest)           -> raise (P.Parse_error "Error parsing if-expressions.")
 %}
 
 (* basic tokens *)
@@ -111,6 +111,7 @@ file_input:
   ss = stmt*; EOF { List.concat ss }
 repl_input:
   NEWLINE { [] }
+| EOF { raise P.Eof_found }
 | s = simple_stmt { s }
 | s = compound_stmt NEWLINE { [s] }
 
