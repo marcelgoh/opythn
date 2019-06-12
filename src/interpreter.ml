@@ -420,7 +420,7 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
              done;
              s_push (List darr)
          | BUILD_DICT n ->
-             let tbl = H.create n in
+             let tbl = H.create ~random:false n in
              for _ = 0 to n - 1 do
                let v = S.pop stack in
                let k = S.pop stack in

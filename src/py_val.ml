@@ -59,15 +59,26 @@ let as_bool = function
   Int i  -> i <> 0
 | Bool b -> b
 | Float f -> f <> 0.0
+| Type s
 | Str s -> s <> ""
 | Fun (_, _) -> true
-| Obj _ | Class _ | Type _
+| List darr -> D.length darr <> 0
+| Tuple arr -> Array.length arr <> 0
+| Dict tbl -> H.length tbl <> 0
+(* interpret empty sequences as false *)
+| Seq seq ->
+   (match seq () with
+       Seq.Nil -> false
+     | Seq.Cons _ -> true)
+| Obj _ | Class _ -> true
 | None -> false
 
 let as_int = function
   Int i  -> i
 | Bool b -> if b then 1 else 0
-| Float _ | Str _ | Fun _
+| Float f -> int_of_float f
+| Str s -> int_of_string s
+| Fun _ | List _ | Tuple _ | Dict _ | Seq _
 | Obj _ | Class _ | Type _ | None ->
     raise Type_error
 
@@ -75,7 +86,9 @@ let as_float = function
   Int i   -> float_of_int i
 | Float f -> f
 | Bool b  -> if b then 1.0 else 0.0
-| Str _ | Fun _ | Obj _ | Class _ | Type _ | None ->
+| Str s -> float_of_string s
+| List _ | Tuple _ | Dict _ | Seq _
+| Fun _ | Obj _ | Class _ | Type _ | None ->
     raise Type_error
 
 let as_seq = function
@@ -100,17 +113,39 @@ let is_str = function
   Str _ -> true
 | _     -> false
 
-(* comparison functions -- TODO: make these better/work with objects *)
-let eq pv1 pv2 = (* uses OCaml's structural equality *)
+(* comparison functions *)
+let rec eq pv1 pv2 = (* uses OCaml's structural equality, usually *)
   if is_float pv1 || is_float pv2 then
     as_float pv1 = as_float pv2
   else if is_int pv1 || is_int pv2 then
          as_int pv1 = as_int pv2
        else
          match (pv1, pv2) with
-           (Str s1, Str s2) -> s1 = s2
+           (Bool x1, Bool x2) -> x1 = x2
+         | (Str x1, Str x2) -> x1 = x2
+         | (Type x1, Type x2) -> x1 = x2
+         | (List x1, List x2) -> x1 = x2
+         | (Tuple x1, Tuple x2) -> x1 = x2
+         | (Fun (s1, f1), Fun (s2, f2)) -> s1 = s2 && f1 == f2
+         (* change this when __eq()__ added *)
+         | (Obj x1, Obj x2) -> x1 == x2
+         | (Class x1, Class x2) -> x1 == x2
+         (* might be sketchy, not quite what Python does *)
+         | (Seq x1, Seq x2) -> x1 == x2
          | (None, None) -> true
-         | _ -> raise Type_error
+         | (Dict (x1 : (t, t) H.t), Dict (x2 : (t, t) H.t)) ->
+             (* check if all values in first list map to same values in second *)
+             let f (key : t) (value : t) (b : bool) : bool =
+               if b then (
+                 match H.find_opt x2 key with
+                   Some v -> eq v value
+                 | None -> false
+               )
+               else false
+             in
+             (* also make sure length of maps same *)
+             H.length x1 = H.length x2 && H.fold f x1 true
+         | _ -> false
 
 let is pv1 pv2 = (* uses OCaml's physical equality *)
   if is_float pv1 || is_float pv2 then
@@ -119,9 +154,18 @@ let is pv1 pv2 = (* uses OCaml's physical equality *)
          as_int pv1 == as_int pv2
        else
          match (pv1, pv2) with
-           (Str s1, Str s2) -> s1 == s2
+           (Bool x1, Bool x2) -> x1 == x2
+         | (Str x1, Str x2)
+         | (Type x1, Type x2) -> x1 == x2
+         | (List x1, List x2) -> x1 == x2
+         | (Tuple x1, Tuple x2) -> x1 == x2
+         | (Fun (s1, f1), Fun (s2, f2)) -> s1 = s2 && f1 == f2
+         | (Obj x1, Obj x2) -> x1 == x2
+         | (Class x1, Class x2) -> x1 == x2
+         | (Seq x1, Seq x2) -> x1 == x2
+         | (Dict x1, Dict x2) -> x1 == x2
          | (None, None) -> true
-         | _ -> raise Type_error
+         | _ -> false
 
 let lt pv1 pv2 = (* uses OCaml's structural comparison *)
   if is_float pv1 || is_float pv2 then

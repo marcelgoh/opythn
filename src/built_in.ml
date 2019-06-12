@@ -53,6 +53,7 @@ let abs args =
       Int i -> Int (abs i)
     | Bool b -> if b then (Int 1) else (Int 0)
     | Float f -> Float (abs_float f)
+    | List _ | Tuple _ | Dict _ | Seq _
     | Str _ | Fun _ | Obj _ | Class _ | Type _ | None ->
         raise (Built_in_error "Cannot operate on non-numeric type: ABS()")
 
@@ -65,6 +66,7 @@ let bin args =
       match List.hd args with
         Int i -> i
       | Bool b -> if b then 1 else 0
+      | List _ | Tuple _ | Dict _ | Seq _
       | Float _ | Str _ | Fun _ | Obj _ | Class _ | Type _ | None ->
           raise (Built_in_error "Cannot operate on non integer type: BIN()")
     in
@@ -84,17 +86,7 @@ let bool_cast args =
   else
     if List.length args <> 1 then
       raise (Built_in_error "At most one argument expected: BOOL()")
-    else
-      match List.hd args with
-        Int i -> Bool (i <> 0)
-      | Bool b -> Bool b
-      | Float f -> Bool (f <> 0.0)
-      | Type s
-      | Str s -> Bool (s <> "")
-      | Obj _
-      | Class _
-      | Fun(_, _) -> Bool true
-      | None -> Bool false
+    else Bool (as_bool (List.hd args))
 
 (* chr() -- only supports ASCII, doesn't match Python 3 exactly *)
 let chr_ascii args =
@@ -102,10 +94,8 @@ let chr_ascii args =
     raise (Built_in_error "Exactly one argument expected: CHR()")
   else
     let num =
-      match List.hd args with
-        Int i -> i
-      | Bool b -> if b then 1 else 0
-      | Float _ | Str _ | Fun _ | Obj _ | Class _ | Type _ | None ->
+      try as_int (List.hd args)
+      with Type_error ->
           raise (Built_in_error "Cannot operate on non integer type: CHR()")
     in
     if num < 0 || num > 255 then
@@ -118,13 +108,9 @@ let float_cast args =
   if List.length args <> 1 then
     raise (Built_in_error "Exactly one argument expected: FLOAT_CAST()")
   else
-    match List.hd args with
-      Int i   -> Float (float_of_int i)
-    | Float f -> Float f
-    | Str s   -> Float (float_of_string s)
-    | Bool b  -> if b then Float 1.0 else Float 0.0
-    | Fun _ | Obj _ | Class _ | Type _ | None ->
-        raise (Built_in_error "Failed typecast: FLOAT_CAST()")
+    try Float (as_float (List.hd args))
+    with Type_error ->
+      raise (Built_in_error "Failed typecast: FLOAT_CAST()")
 
 (* hex() and oct() *)
 let hex_oct is_hex args =
@@ -132,10 +118,8 @@ let hex_oct is_hex args =
     raise (Built_in_error "Exactly one argument expected: HEX()")
   else
     let num =
-      match List.hd args with
-        Int i -> i
-      | Bool b -> if b then 1 else 0
-      | Float _ | Str _ | Fun _ | Obj _ | Class _ | Type _ | None ->
+      try as_int (List.hd args)
+      with Type_error ->
           raise (Built_in_error "Cannot operate on non integer type: HEX()")
     in
     let sign = if num < 0 then "-" else "" in
@@ -158,13 +142,9 @@ let int_cast args =
   if List.length args <> 1 then
     raise (Built_in_error "Exactly one argument expected: INT_CAST()")
   else
-    match List.hd args with
-      Int i   -> Int i
-    | Float f -> Int (int_of_float f)
-    | Str s   -> Int (int_of_string s)
-    | Bool b  -> if b then Int 1 else Int 0
-    | Fun _ | Obj _ | Class _ | Type _ | None ->
-        raise (Built_in_error "Failed typecast: INT_CAST()")
+    try Int (as_int (List.hd args))
+    with Type_error ->
+      raise (Built_in_error "Failed typecast: INT_CAST()")
 
 (* ord() -- only supports ASCII, doesn't match Python 3 exactly *)
 let ord args =
