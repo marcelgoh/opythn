@@ -470,13 +470,14 @@ let rec compile_stmts in_repl in_class stmts enclosings table =
   resolve_stmts stmts;   (* fill the hashtable of depths *)
 (*   H.iter print_entry table; *)
   compile_iter stmts;    (* compile *)
-  if D.last instrs <> RETURN_VALUE then (
+  instrs
+
+(* interface to the rest of the system *)
+let compile_prog in_repl (p : Ast.program) : code =
+  let instrs = compile_stmts in_repl false p [] (H.create 10) in
+  if not in_repl && D.last instrs <> RETURN_VALUE then (
     D.add instrs (LOAD_CONST None);
     D.add instrs RETURN_VALUE
   )
   else ();
   instrs
-
-(* interface to the rest of the system *)
-let compile_prog in_repl (p : Ast.program) : code =
-  compile_stmts in_repl false p [] (H.create 10)

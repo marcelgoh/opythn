@@ -178,13 +178,46 @@ let lt pv1 pv2 = (* uses OCaml's structural comparison *)
          as_int pv1 < as_int pv2
        else
          match (pv1, pv2) with
-           (Str s1, Str s2) -> s1 < s2
+           (Bool b1, Bool b2) -> b1 < b2
+         | (Str s1, Str s2) -> s1 < s2
          | (None, None) -> true
+         (* do not compare lists, tuples, etc. using < *)
          | _ -> raise Type_error
 
+(* check if pv2 is in pv2 *)
 let py_in pv1 pv2 =
-  match pv2 with
-    Int _ | Float _ | Bool _ | Str _ | Fun _
-  | Obj _ | Class _ | Type _ | None ->
+  let module Loop =
+    struct
+      exception Exit
+    end
+  in
+  (* true if s1 is in s2 *)
+  let str_in s1 s2 =
+    try (
+      Str.search_forward (Str.regexp_string s2) s1 0 |> ignore;
+      true
+    ) with Not_found -> false
+  in
+  (* filter the Seq.t object to match pv *)
+  let in_seq pv seq =
+    match (Seq.filter (fun pv' -> eq pv pv') seq) () with
+      Nil -> false
+    | Cons(_, _) -> true
+  in
+  match (pv1, pv2) with
+    (Str s1, Str s2) -> str_in s1 s2
+  | (_, List darr2) ->
+      (try
+         for i = 0 to D.length darr2 do
+           if eq pv1 (D.get darr2 i) then
+             raise Loop.Exit
+           else ()
+         done;
+         false
+       with Loop.Exit -> true)
+  | (_, Tuple arr2) -> Array.exists (eq pv1) arr2
+  | (_, Seq seq) -> in_seq pv1 seq
+  | (_, Dict htbl) -> in_seq pv2 (H.to_seq_keys htbl)
+  | _ ->
       raise Type_error (* not iterable *)
 

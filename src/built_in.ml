@@ -8,10 +8,10 @@ module H = Hashtbl
 exception Built_in_error of string
 
 (* helper functions - not in built-in scope *)
-let print args =
-  let rec print' with_space args =
+let rec print args =
+  let rec print' with_space args : unit =
   match args with
-    []      -> None
+    []      -> ()
   | pv::pvs ->
       if with_space then
         printf " "
@@ -35,6 +35,32 @@ let print args =
            printf "<Class `%s`>" cls.name
        | Type str ->
            printf "<Type `%s`>" str
+       | List darr ->
+           printf "[";
+           let n = D.length darr in
+           for i = 0 to n - 1 do
+             print [D.get darr i];
+             if i = n - 1 then printf "]" else printf ", "
+           done
+       | Tuple arr ->
+           printf "(";
+           let n = Array.length arr in
+           for i = 0 to n - 1 do
+             print [arr.(i)];
+             if i = n - 1 then printf ")" else printf ", "
+           done
+       | Dict htbl ->
+           let comma = ref "" in
+           let f key value =
+             printf "%s" !comma;
+             comma := ", ";   (* comma is only empty in the first iteration *)
+             print [key];
+             printf ": ";
+             print [value];
+           in
+           printf "{"; H.iter f htbl; printf "}"
+       | Seq seq ->
+           Seq.iter (fun pv -> print [pv]) seq (* might run forever, who knows *)
        | None ->
            printf "None"
       );
@@ -155,6 +181,7 @@ let ord args =
       match List.hd args with
         Str s -> s
       | Int _ | Float _ | Bool _ | Fun _
+      | List _ | Tuple _ | Dict _ | Seq _
       | Obj _ | Class _ | Type _ | None ->
           raise (Built_in_error "String expected: ORD()")
     in
@@ -179,12 +206,14 @@ let round args =
               Int i   -> float_of_int i
             | Bool b  -> if b then 1.0 else 0.0
             | Float f -> f
+            | List _ | Tuple _ | Dict _ | Seq _
             | Str _ | Fun _ | Obj _ | Class _ | Type _ | None ->
                 raise (Built_in_error "Cannot round non-numeric type: ROUND()")
     in
     let d = match digits with
               Int i  -> i
             | Bool b -> if b then 1 else 0
+            | List _ | Tuple _ | Dict _ | Seq _
             | Float _ | Str _ | Fun _ | Obj _ | Class _ | Type _ | None ->
                 raise (Built_in_error "Precision must be integer: ROUND()")
     in
@@ -207,6 +236,10 @@ let get_type args =
     | Obj o   -> Type o.cls.name
     | Class _ -> Type "type"
     | Type _  -> Type "type"
+    | List _  -> Type "list"
+    | Tuple _ -> Type "tuple"
+    | Dict _  -> Type "dict"
+    | Seq _   -> Type "sequence"
     | None    -> Type "NoneType"
 
 (* these functions rely on type() *)
@@ -249,7 +282,7 @@ let isinstance args =
            (match get_type [pv1] with
               Type str -> Bool (t = str)
             | _ -> Bool false)
-       | Int _ | Float _ | Str _ | Bool _ | Fun _ | Obj _ | None ->
+       | _ ->
            raise (Built_in_error "Second argument must be a class or type: ISINSTANCE()")
       )
   | _ ->
