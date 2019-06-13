@@ -49,9 +49,17 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
   (* stack machine *)
   let (stack : Py_val.t S.t) = S.create () in
   (* set to true if the next CALL_FUNCTION is a method call *)
-  let s_push pv = S.push pv stack in
-  let store_name scope id =
+  let s_push pv =
+(*     printf "Pushed: %s\n" (str_of_py_val pv); *)
+    S.push pv stack
+  in
+  let s_pop () : Py_val.t =
     let tos = S.pop stack in
+(*     printf "Popped: %s\n" (str_of_py_val tos); *)
+    tos
+  in
+  let store_name scope id =
+    let tos = s_pop () in
     H.replace scope id tos
   in
   let module Loop =
@@ -67,22 +75,22 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
         let next = ref (!idx + 1) in
         (match D.get c !idx with
            NOP -> ()
-         | POP_TOP -> S.pop stack |> ignore
+         | POP_TOP -> s_pop () |> ignore
          | UNARY_NEG ->
-             let tos = S.pop stack in
+             let tos = s_pop () in
              (try if is_float tos then
                     s_push (Float (-. (as_float tos)))
                   else
                     s_push (Int (- (as_int tos)))
               with Type_error -> raise (Runtime_error "Wrong type: UNARY_NEG"))
          | UNARY_NOT ->
-             s_push (Bool (not (as_bool (S.pop stack))))
+             s_push (Bool (not (as_bool (s_pop ()))))
          | UNARY_BW_COMP ->
-             (try s_push (Int (lnot (as_int (S.pop stack))))
+             (try s_push (Int (lnot (as_int (s_pop ()))))
               with Type_error -> raise (Runtime_error "Wrong type: UNARY_BW_COMP"))
          | BINARY_ADD ->
-             let tos = S.pop stack in
-             let tos1 = S.pop stack in
+             let tos = s_pop () in
+             let tos1 = s_pop () in
              (try
                 (match (tos1, tos) with
                    (Str s, Str t) -> s_push (Str (s ^ t))
@@ -92,32 +100,32 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
                                        s_push (Int ((as_int tos1) + (as_int tos))))
               with Type_error -> raise (Runtime_error "Type mismatch: BINARY_ADD"))
          | BINARY_SUB ->
-             let tos = S.pop stack in
-             let tos1 = S.pop stack in
+             let tos = s_pop () in
+             let tos1 = s_pop () in
              (try if is_float tos1 || is_float tos then
                     s_push (Float ((as_float tos1) -. (as_float tos)))
                   else
                     s_push (Int ((as_int tos1) - (as_int tos)))
                with Type_error -> raise (Runtime_error "Type mismatch: BINARY_SUB"))
          | BINARY_MULT ->
-             let tos = S.pop stack in
-             let tos1 = S.pop stack in
+             let tos = s_pop () in
+             let tos1 = s_pop () in
              (try if is_float tos1 || is_float tos then
                     s_push (Float ((as_float tos1) *. (as_float tos)))
                   else
                     s_push (Int ((as_int tos1) * (as_int tos)))
               with Type_error -> raise (Runtime_error "Type mismatch: BINARY_MULT"))
          | BINARY_FP_DIV ->
-             let tos = S.pop stack in
-             let tos1 = S.pop stack in
+             let tos = s_pop () in
+             let tos1 = s_pop () in
              (match F.classify_float @@ as_float tos with
                 FP_zero -> raise (Runtime_error "Division by zero: BINARY_FP_DIV")
               | _       ->
                 (try s_push (Float ((as_float tos1) /. (as_float tos)))
                  with Type_error -> raise (Runtime_error "Type mismatch: BINARY_FP_DIV")))
          | BINARY_INT_DIV ->
-             let tos = S.pop stack in
-             let tos1 = S.pop stack in
+             let tos = s_pop () in
+             let tos1 = s_pop () in
              (match F.classify_float @@ as_float tos with
                 FP_zero -> raise (Runtime_error "Division by zero: BINARY_INT_DIV")
               | _       ->
@@ -127,8 +135,8 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
                        s_push (Int (int_of_float (floor ((as_float tos1) /. (as_float tos)))))
                  with Type_error -> raise (Runtime_error "Type mismatch: BINARY_INT_DIV")))
          | BINARY_MOD ->
-             let tos = S.pop stack in
-             let tos1 = S.pop stack in
+             let tos = s_pop () in
+             let tos1 = s_pop () in
              (match F.classify_float @@ as_float tos with
                 FP_zero -> raise (Runtime_error "Division by zero: BINARY_MOD")
               | _       ->
@@ -143,8 +151,8 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
                        s_push (Int ans)
                  with Type_error -> raise (Runtime_error "Type mismatch: BINARY_MOD")))
          | BINARY_EXP ->
-             let tos = S.pop stack in
-             let tos1 = S.pop stack in
+             let tos = s_pop () in
+             let tos1 = s_pop () in
              (try if is_float tos1 || is_float tos then
                     let ans = ((as_float tos1) ** (as_float tos)) in
                     match F.classify_float ans with
@@ -163,81 +171,81 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
                         s_push (Int (int_exp (as_int tos1) (as_int tos)))
               with Type_error -> raise (Runtime_error "Type mismatch: BINARY_EXP"))
          | BINARY_LSHIFT ->
-             let tos = S.pop stack in
-             let tos1 = S.pop stack in
+             let tos = s_pop () in
+             let tos1 = s_pop () in
              (try s_push (Int ((as_int tos1) lsl (as_int tos)))
               with Type_error -> raise (Runtime_error "Type mismatch: BINARY_LSHIFT"))
          | BINARY_RSHIFT ->
-             let tos = S.pop stack in
-             let tos1 = S.pop stack in
+             let tos = s_pop () in
+             let tos1 = s_pop () in
              (try s_push (Int ((as_int tos1) asr (as_int tos)))
               with Type_error -> raise (Runtime_error "Type mismatch: BINARY_RSHIFT"))
          | BINARY_BW_AND ->
-             let tos = S.pop stack in
-             let tos1 = S.pop stack in
+             let tos = s_pop () in
+             let tos1 = s_pop () in
              (try s_push (Int ((as_int tos1) land (as_int tos)))
               with Type_error -> raise (Runtime_error "Type mismatch: BINARY_BW_AND"))
          | BINARY_BW_OR ->
-             let tos = S.pop stack in
-             let tos1 = S.pop stack in
+             let tos = s_pop () in
+             let tos1 = s_pop () in
              (try s_push (Int ((as_int tos1) lor (as_int tos)))
               with Type_error -> raise (Runtime_error "Type mismatch: BINARY_BW_OR"))
          | BINARY_BW_XOR ->
-             let tos = S.pop stack in
-             let tos1 = S.pop stack in
+             let tos = s_pop () in
+             let tos1 = s_pop () in
              (try s_push (Int ((as_int tos1) lxor (as_int tos)))
               with Type_error -> raise (Runtime_error "Type mismatch: BINARY_BW_XOR"))
          | COMPARE_EQ ->
-             let tos = S.pop stack in
-             let tos1 = S.pop stack in
+             let tos = s_pop () in
+             let tos1 = s_pop () in
              (try s_push (Bool (eq tos1 tos))
               with Type_error -> raise (Runtime_error "Type mismatch: COMPARE_EQ"))
          | COMPARE_NEQ ->
-             let tos = S.pop stack in
-             let tos1 = S.pop stack in
+             let tos = s_pop () in
+             let tos1 = s_pop () in
              (try s_push (Bool (not (eq tos1 tos)))
               with Type_error -> raise (Runtime_error "Type mismatch: COMPARE_NEQ"))
          | COMPARE_LT ->
-             let tos = S.pop stack in
-             let tos1 = S.pop stack in
+             let tos = s_pop () in
+             let tos1 = s_pop () in
              (try s_push (Bool (lt tos1 tos))
               with Type_error -> raise (Runtime_error "Type mismatch: COMPARE_LT"))
          | COMPARE_GT ->
-             let tos = S.pop stack in
-             let tos1 = S.pop stack in
+             let tos = s_pop () in
+             let tos1 = s_pop () in
              (try s_push (Bool (lt tos tos1)) (* switch order and call lt *)
               with type_error -> raise (Runtime_error "type mismatch: compare_gt"))
          | COMPARE_LEQ ->
-             let tos = S.pop stack in
-             let tos1 = S.pop stack in
+             let tos = s_pop () in
+             let tos1 = s_pop () in
              (try s_push (Bool (not (lt tos tos1))) (* not gt *)
               with Type_error -> raise (Runtime_error "Type mismatch: COMPARE_LEQ"))
          | COMPARE_GEQ ->
-             let tos = S.pop stack in
-             let tos1 = S.pop stack in
+             let tos = s_pop () in
+             let tos1 = s_pop () in
              (try s_push (Bool (not (lt tos1 tos))) (* not lt *)
               with Type_error -> raise (Runtime_error "Type mismatch: COMPARE_LEQ"))
          | COMPARE_IS ->
-             let tos = S.pop stack in
-             let tos1 = S.pop stack in
+             let tos = s_pop () in
+             let tos1 = s_pop () in
              (try s_push (Bool (is tos1 tos))
               with Type_error -> raise (Runtime_error "Type mismatch: COMPARE_IS"))
          | COMPARE_IN ->
-             let tos = S.pop stack in
-             let tos1 = S.pop stack in
+             let tos = s_pop () in
+             let tos1 = s_pop () in
              (try s_push (Bool (py_in tos1 tos))
               with Type_error -> raise (Runtime_error "Type mismatch: COMPARE_IN"))
          | COMPARE_NOT_IN ->
-             let tos = S.pop stack in
-             let tos1 = S.pop stack in
+             let tos = s_pop () in
+             let tos1 = s_pop () in
              (try s_push (Bool (not (py_in tos1 tos)))
               with Type_error -> raise (Runtime_error "Type mismatch: COMPARE_NOT_IN"))
          | COMPARE_IS_NOT ->
-             let tos = S.pop stack in
-             let tos1 = S.pop stack in
+             let tos = s_pop () in
+             let tos1 = s_pop () in
              (try s_push (Bool (not (is tos1 tos)))
               with Type_error -> raise (Runtime_error "Type mismatch: COMPARE_IS_NOT"))
-         | RETURN_VALUE -> raise (Loop.Exit (S.pop stack)) (* return top of stack *)
+         | RETURN_VALUE -> raise (Loop.Exit (s_pop ())) (* return top of stack *)
          | STORE_LOCAL(n, id) ->
              (match List.nth_opt envr.locals n with
                 None -> raise (Runtime_error "Tried to access non-existent scope: STORE_LOCAL")
@@ -253,20 +261,20 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
                    | Some pv -> s_push pv))
          | LOAD_GLOBAL id -> s_push @@ lookup_global envr id
          | JUMP t -> next := t
-         | POP_JUMP_IF_FALSE t -> if as_bool (S.pop stack) then () else next := t
+         | POP_JUMP_IF_FALSE t -> if as_bool (s_pop ()) then () else next := t
          | JUMP_IF_TRUE_OR_POP t ->
              if as_bool (S.top stack) then next := t
-             else S.pop stack |> ignore
+             else s_pop () |> ignore
          | JUMP_IF_FALSE_OR_POP t ->
              if not (as_bool (S.top stack)) then next := t
-             else S.pop stack |> ignore
+             else s_pop () |> ignore
          | CALL_FUNCTION argc ->
              let arglist = ref [] in
              for _ = 0 to argc - 1 do
-               arglist := (S.pop stack) :: !arglist
+               arglist := s_pop () :: !arglist
              done;
              let retval =
-               match S.pop stack with
+               match s_pop () with
                  Fun (_, f) -> f !arglist
                | Class c ->
                    let obj = Obj { cls = c; fields = H.create 10; } in
@@ -296,7 +304,7 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
                                                globals = envr.globals; }
                           ))))
          | MAKE_CLASS (num_supers, block) ->
-             let tos_opt = if num_supers = 1 then Some (S.pop stack) else None in
+             let tos_opt = if num_supers = 1 then Some (s_pop ()) else None in
              let super_opt : Py_val.cls option =
                match tos_opt with
                  None -> None
@@ -350,15 +358,15 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
              in
              s_push value_to_push
          | STORE_ATTR id ->
-             let tos = S.pop stack in
-             let tos1 = S.pop stack in
+             let tos = s_pop () in
+             let tos1 = s_pop () in
              (match tos with
                 Obj obj -> H.replace obj.fields id tos1
               | Class cls -> H.replace cls.attrs id tos1
               | _ -> raise (Runtime_error
                               (sprintf "Cannot set attribute `%s`: STORE_ATTR" id)))
          | LOAD_ATTR id ->
-             let tos = S.pop stack in
+             let tos = s_pop () in
              (match tos with
                 Obj obj ->
                   (match Py_val.get_field_opt obj id with
@@ -390,11 +398,11 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
                               (sprintf "Object has no attribute `%s`: LOAD_ATTR" id))
              );
          | BUILD_SEQ ->
-             (try s_push (Seq (as_seq (S.pop stack)))
+             (try s_push (Seq (as_seq (s_pop ())))
               with Type_error ->
                 raise (Runtime_error "Failed to build sequence: BUILD_SEQ"))
          | FOR_ITER idx ->
-             let tos = S.pop stack in
+             let tos = s_pop () in
              (match tos with
                 Seq s ->
                   (match s () with
@@ -408,21 +416,21 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
              let arr = Array.make n None in
              for i = 0 to n - 1 do
                (* populate array in reverse *)
-               arr.(n - 1) <- S.pop stack
+               arr.(n - 1) <- s_pop ()
              done;
              s_push (Tuple arr)
          | BUILD_LIST n ->
              let darr = D.create () in
              for _ = 0 to n - 1 do
                (* build array in reverse *)
-               D.insert darr 0 (S.pop stack)
+               D.insert darr 0 (s_pop ())
              done;
              s_push (List darr)
          | BUILD_DICT n ->
              let tbl = H.create ~random:false n in
              for _ = 0 to n - 1 do
-               let v = S.pop stack in
-               let k = S.pop stack in
+               let v = s_pop () in
+               let k = s_pop () in
                H.add tbl k v
              done;
              s_push (Dict tbl)
@@ -438,7 +446,7 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
         idx := !next
       done;
       (* default behaviour when no RETURN_VALUE is encountered is to return TOS *)
-      if S.is_empty stack then Py_val.None else S.pop stack
+      if S.is_empty stack then Py_val.None else s_pop ()
     )
     with Loop.Exit pv -> pv
   in

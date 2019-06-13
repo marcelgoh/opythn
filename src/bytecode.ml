@@ -366,7 +366,12 @@ let rec compile_stmts in_repl in_class stmts enclosings table =
       done
     in
     (match s with
-       Expr e -> compile_and_add_expr e;
+       Expr e ->
+         (match e with
+            Call (_, _) ->
+              compile_and_add_expr e;
+              D.add instrs POP_TOP
+          | _ -> compile_and_add_expr e)
      | Assign (Var id, e) ->
          compile_and_add_expr e;
          D.add instrs (get_store_instr id)
