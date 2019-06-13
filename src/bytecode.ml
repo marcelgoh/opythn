@@ -370,7 +370,10 @@ let rec compile_stmts in_repl in_class stmts enclosings table =
          (match e with
             Call (_, _) ->
               compile_and_add_expr e;
-              D.add instrs POP_TOP
+              if in_repl && not in_loop then
+                ()
+              else
+                D.add instrs POP_TOP
           | _ -> compile_and_add_expr e)
      | Assign (Var id, e) ->
          compile_and_add_expr e;

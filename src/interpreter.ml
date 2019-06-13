@@ -9,6 +9,7 @@ module S = Stack
 
 exception Runtime_error of string
 exception Type_error
+exception Bound_error of int
 
 type scope = (string, Py_val.t) H.t
 
@@ -434,14 +435,71 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
                H.add tbl k v
              done;
              s_push (Dict tbl)
-         | SUBSCR
-         | SLICESUB
+         | SUBSCR ->
+             let tos = s_pop () in    (* TOS <- TOS1[TOS] *)
+             let tos1 = s_pop () in
+             let get_idx n =
+               (* converts to positive index *)
+               let i = as_int tos in
+               let ret_val = if i < 0 then i + n else i in
+               if ret_val < 0 || ret_val >= n then
+                 (* also checks bounds *)
+                 raise (Bound_error i)
+               else ret_val
+             in
+             (match tos1 with
+                Str s ->
+                  let idx = get_idx (String.length s) in
+                  s_push (Str (String.make 1 s.[idx]))
+              | List darr ->
+                  let idx = get_idx (D.length darr) in
+                  s_push (D.get darr idx)
+              | Tuple arr ->
+                  let idx = get_idx (Array.length arr) in
+                  s_push arr.(idx)
+              | Dict htbl ->
+                  (match H.find_opt htbl tos with
+                     Some v -> s_push v
+                   | None ->
+                       raise (Runtime_error "Key not found: SUBSCR"))
+              | _ ->
+                  raise (Runtime_error "Object not subscriptable: SUBSCR"))
+         | SLICESUB ->
+             let tos = s_pop () in     (* TOS <- TOS2[TOS1:TOS] *)
+             let tos1 = s_pop () in
+             let tos2 = s_pop () in
+             let pos_idx idx n =
+               let ret_val = if idx < 0 then idx + n else idx in
+               if ret_val < 0 || ret_val >= n then
+                 (* also checks bounds *)
+                 raise (Bound_error idx)
+               else ret_val
+             in
+             let sub_len i n =
+               let j = pos_idx (as_int tos) n in
+               if i > j then 0 else j - i
+             in
+             (match tos2 with
+                Str s ->
+                  let n = String.length s in
+                  let i = pos_idx (as_int tos1) n in
+                  s_push (Str (String.sub s i (sub_len i n)))
+              | List darr ->
+                  let n = D.length darr in
+                  let i = pos_idx (as_int tos1) n in
+                  s_push (List (D.sub darr i (sub_len i n)))
+              | Tuple arr ->
+                  let n = Array.length arr in
+                  let i = pos_idx (as_int tos1) n in
+                  s_push (Tuple (Array.sub arr i (sub_len i n)))
+              | _ -> raise (Runtime_error "Object not slice-subscriptable: SLICESUB"))
          | DELETE_LOCAL _ (* (n, id) *)
          | DELETE_GLOBAL _ (* id *)
          | DELETE_NAME _ (* id *)
          | DELETE_ATTR _ (* id *)
          | DELETE_SUBSCR
-         | DELETE_SLICESUB -> ()
+         | DELETE_SLICESUB ->
+             printf "Instruction not yet implemented.\n";
         );
         idx := !next
       done;

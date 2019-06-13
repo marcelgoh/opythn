@@ -172,6 +172,25 @@ let int_cast args =
     with Type_error ->
       raise (Built_in_error "Failed typecast: INT_CAST()")
 
+(* len() *)
+let len args =
+  if List.length args <> 1 then
+    raise (Built_in_error "Exactly one argument expected: LEN()")
+  else
+    match List.hd args with
+      Str s -> Int (String.length s)
+    | List darr -> Int (D.length darr)
+    | Tuple arr -> Int (Array.length arr)
+    | Dict htbl -> Int (H.length htbl)
+    | Seq seq ->
+        (* might take forever, who knows *)
+        let count = ref 0 in
+        Seq.iter (fun _ -> incr count) seq;
+        Int !count
+    | Int _ | Float _ | Bool _ | Obj _ | Fun _
+    | Class _ | Type _ | None ->
+        raise (Built_in_error "Non-sequence type: LEN()")
+
 (* ord() -- only supports ASCII, doesn't match Python 3 exactly *)
 let ord args =
   if List.length args <> 1 then
@@ -356,6 +375,7 @@ let table : (string, Py_val.t) Hashtbl.t =
   H.add tbl "isinstance" (Fun ("isinstance", isinstance));
   H.add tbl "issubclass" (Fun ("issubclass", issubclass));
   H.add tbl "int" (Fun ("int", int_cast));
+  H.add tbl "len" (Fun ("len", len));
   H.add tbl "oct" (Fun ("oct", (hex_oct false)));
   H.add tbl "ord" (Fun ("ord", ord));
   H.add tbl "print" (Fun ("print", print_ln));
