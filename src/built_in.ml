@@ -60,7 +60,13 @@ let rec print args =
            in
            printf "{"; H.iter f htbl; printf "}"
        | Seq seq ->
-           Seq.iter (fun pv -> print [pv]) seq (* might run forever, who knows *)
+           (* Seq.iter (fun pv -> print [pv]) seq (* might run forever, who knows *) *)
+           (match seq () with
+              Seq.Nil -> printf "<Sequence (empty)>"
+            | Seq.Cons(pv, _) ->
+                printf "<Sequence (";
+                print [pv];
+                printf ", ...)>")
        | None ->
            printf "None"
       );
@@ -214,6 +220,36 @@ let print_ln args =
   print args |> ignore;
   printf "\n";
   None
+
+(* range() *)
+let range args =
+  let (start, bound, step) =
+    match args with
+      [Int i] -> (0, i, 1)
+    | [Int i; Int j] -> (i, j, 1)
+    | [Int i; Int j; Int k] ->
+        if k = 0 then raise (Built_in_error "Step cannot be zero: RANGE()")
+        else (i, j, k)
+    | _ -> raise (Built_in_error "At most three arguments expected: RANGE()")
+  in
+  let compare = if bound < start then (>) else (<) in
+  let make_thunk () =
+    let next = ref start in
+    let rec do_step () =
+      let stepped = !next + step in
+      if compare stepped bound then (
+        next := stepped;
+        (fun () -> Seq.Cons(Int stepped, do_step ()))
+      )
+      else
+        (fun () -> Seq.Nil)
+    in
+    if (step > 0 && bound > start) || (step < 0 && bound < start) then
+      (fun () -> Seq.Cons(Int start, do_step ()))
+    else
+      (fun () -> Seq.Nil)
+  in
+  Seq (make_thunk ())
 
 (* round() *)
 let round args =
@@ -379,6 +415,7 @@ let table : (string, Py_val.t) Hashtbl.t =
   H.add tbl "oct" (Fun ("oct", (hex_oct false)));
   H.add tbl "ord" (Fun ("ord", ord));
   H.add tbl "print" (Fun ("print", print_ln));
+  H.add tbl "range" (Fun ("range", range));
   H.add tbl "round" (Fun ("round", round));
   H.add tbl "type" (Fun ("type", get_type));
   tbl
