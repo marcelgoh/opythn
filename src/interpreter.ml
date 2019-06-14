@@ -70,7 +70,7 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
   in
   (* loop over instructions -- changed to a while-loop because OCaml couldn't perform TCO *)
   let loop () : Py_val.t =
-    let idx = ref 0 in
+    let program_counter = ref 0 in
     (* get positive index if i in list of length n *)
     let pos_idx idx n =
       let ret_val = if idx < 0 then idx + n else idx in
@@ -93,9 +93,9 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
       if i > j' then 0 else j' - i
     in
     try (
-      while !idx < D.length c do
-        let next = ref (!idx + 1) in
-        (match D.get c !idx with
+      while !program_counter < D.length c do
+        let next = ref (!program_counter + 1) in
+        (match D.get c !program_counter with
            NOP -> ()
          | POP_TOP -> s_pop () |> ignore
          | UNARY_NEG ->
@@ -423,12 +423,12 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
              (try s_push (Seq (as_seq (s_pop ())))
               with Type_error ->
                 raise (Runtime_error "Failed to build sequence: BUILD_SEQ"))
-         | FOR_ITER idx ->
+         | FOR_ITER program_counter ->
              let tos = s_pop () in
              (match tos with
                 Seq s ->
                   (match s () with
-                     Seq.Nil -> next := idx  (* end of sequence, jump forward *)
+                     Seq.Nil -> next := program_counter  (* end of sequence, jump forward *)
                    | Seq.Cons(pv, rest) ->
                        s_push (Seq rest);    (* push rest of sequence for next iteration *)
                        s_push pv)            (* this value will be assigned to iter var *)
@@ -549,8 +549,73 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
               | Tuple arr ->
                   raise (Runtime_error "Tuples do not support item deletion: DELETE_SLICESUB")
               | _ -> raise (Runtime_error "Object not slice-subscriptable: SLICESUB"))
+         | STORE_SUBSCR ->
+             let tos = s_pop () in     (* TOS1[TOS] <- TOS2 *)
+             let tos1 = s_pop () in
+             let tos2 = s_pop () in
+             (match tos1 with
+                Str s ->
+                  raise (Runtime_error "Strings do not support item assignment: STORE_SUBSCR")
+              | List darr ->
+                  let idx = subscr_get_idx (as_int tos) (D.length darr) in
+                  D.set darr idx tos2
+              | Tuple arr ->
+                  raise (Runtime_error "Tuples do not support item assignment: STORE_SUBSCR")
+              | Dict htbl ->
+                  (match H.find_opt htbl tos with
+                     Some v -> H.replace htbl tos tos2
+                   | None ->
+                       raise (Runtime_error "Key not found: STORE_SUBSCR"))
+              | _ ->
+                  raise (Runtime_error "Object not subscriptable: STORE_SUBSCR"))
+         | STORE_SLICESUB ->
+             let tos = s_pop () in     (* TOS2[TOS1:TOS] <- TOS3 *)
+             let tos1 = s_pop () in
+             let tos2 = s_pop () in
+             let tos3 = s_pop () in
+             (match tos2 with
+                Str s ->
+                  raise (Runtime_error "Strings do not support item assignment: STORE_SLICESUB")
+              | List darr ->
+                  let n = D.length darr in
+                  let i = pos_idx (as_int tos1) n in
+                  (* delete old values in the slice *)
+                  D.delete_range darr i (sub_len i (as_int tos) n);
+                  (match tos3 with
+                     List new_darr ->
+                       for k = 0 to D.length new_darr - 1 do
+                         D.insert darr (i + k) (D.get new_darr k)
+                       done
+                   | Tuple new_arr ->
+                       for k = 0 to Array.length new_arr - 1 do
+                         D.insert darr (i + k) new_arr.(k)
+                       done
+                   | Str str ->
+                       for k = 0 to String.length str - 1 do
+                         D.insert darr (i + k) (Str (String.make 1 str.[k]))
+                       done
+                   | Seq seq ->
+                       let module Iter =
+                         struct
+                           exception Break
+                         end
+                       in
+                       let ptr = ref seq in
+                       let idx = ref i in
+                       while true do
+                         (match (!ptr) () with
+                            Seq.Nil -> raise Iter.Break
+                          | Seq.Cons(next, rest) ->
+                              ptr := rest;
+                              D.insert darr !idx next;
+                              incr idx)
+                       done
+                   | _ -> raise (Runtime_error "Can only assign from iterable: STORE_SLICESUB"))
+              | Tuple arr ->
+                  raise (Runtime_error "Tuples do not support item assignment: STORE_SLICESUB")
+              | _ -> raise (Runtime_error "Object not slice-subscriptable: STORE_SLICESUB"))
         );
-        idx := !next
+        program_counter := !next
       done;
       (* default behaviour when no RETURN_VALUE is encountered is to return TOS *)
       if S.is_empty stack then Py_val.None else s_pop ()

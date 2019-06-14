@@ -63,6 +63,10 @@ type t =
 | SUBSCR
 (* TOS <- TOS2[TOS1:TOS] *)
 | SLICESUB
+(* TOS1[TOS] <- TOS2 *)
+| STORE_SUBSCR
+(* TOS2[TOS1:TOS] <- TOS3 *)
+| STORE_SLICESUB
 (* delete operations *)
 | DELETE_LOCAL of (* depth : *) int * (* name : *) string
 | DELETE_GLOBAL of (* name : *) string

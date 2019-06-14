@@ -120,6 +120,9 @@ let rec compile_stmts in_repl in_class stmts enclosings table =
              resolve_expr e;
              (* we don't resolve the identifier *)
              resolve_expr obj
+         | Assign(Subscr(seq, i, slice), e) ->
+             resolve_expr e;
+             resolve_expr (Subscr(seq, i, slice))
          | Assign(_, _) ->
              raise (Bytecode_error "Tried to assign to non-assignable expression")
          | If(c, s1, s2) ->
@@ -382,6 +385,15 @@ let rec compile_stmts in_repl in_class stmts enclosings table =
          compile_and_add_expr e;
          compile_and_add_expr obj;
          D.add instrs (STORE_ATTR id)
+     | Assign (Subscr(seq, i, slice), e) ->
+         compile_and_add_expr e;   (* expression to be assigned *)
+         compile_and_add_expr seq;
+         compile_and_add_expr i;
+         (match slice with
+            Some j ->
+              compile_and_add_expr j;
+              D.add instrs STORE_SLICESUB   (* pops 4 off stack *)
+          | None -> D.add instrs STORE_SUBSCR)  (* pops 3 off stack *)
      | Assign(_, _) ->
          raise (Bytecode_error "Tried to assign to non-assignable expression")
      | If (c, s1, s2) ->

@@ -84,6 +84,7 @@
 %type <Ast.expr> cond_expr
 %type <Ast.op> comp_op
 %type <Ast.expr> slice
+%type <Ast.expr> subscription
 %type <Ast.expr> expr
 %type <Ast.expr> attributeref
 %type <Ast.stmt> aug_assign
@@ -180,6 +181,7 @@ deep_suite:
 assig_target:
   s = ID { Var s }
 | a = attributeref { a }
+| s = subscription { s }
 assignment_stmt:
 | target = assig_target; ASSIG; e = assignable_expr { Assign(target, e) }
 
@@ -200,8 +202,13 @@ comp_op:
   LT { Lt }   | GT { Gt }   | EQ { Eq } | LEQ { Leq }
 | GEQ { Geq } | NEQ { Neq } | IN { In } | NOT_IN { NotIn }
 | IS { Is }   | IS_NOT { IsNot }
+(* subscription and slicing *)
 slice:
   COLON; e = expr { e }
+subscription:
+  e1 = expr; LSQUARE; e2 = expr; sl = slice?; RSQUARE {
+    Subscr(e1, e2, sl)
+  }
 expr:
   a = atom { a }
 | c = call { c }
@@ -232,10 +239,7 @@ expr:
 | LAMBDA; args = param_id_list; COLON; body = expr {
     Lambda(args, body)
   } %prec LAMBDA
-(* subscription and slicing *)
-| e1 = expr; LSQUARE; e2 = expr; sl = slice?; RSQUARE {
-    Subscr(e1, e2, sl)
-  }
+| s = subscription { s }
 
 (* attribute reference *)
 attributeref:

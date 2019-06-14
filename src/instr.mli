@@ -59,14 +59,18 @@ type t =
 | SUBSCR
 (* TOS <- TOS2[TOS1:TOS] *)
 | SLICESUB
+(* TOS1[TOS] <- TOS2 *)
+| STORE_SUBSCR
+(* TOS2[TOS1:TOS] <- TOS3 *)
+| STORE_SLICESUB
 (* delete operations *)
 | DELETE_LOCAL of (* depth : *) int * (* name : *) string
 | DELETE_GLOBAL of (* name : *) string
 | DELETE_NAME of (* name : *) string
-| DELETE_ATTR of (* name : *) string
+| DELETE_ATTR of (* name : *) string  (* del TOS.name *)
 | DELETE_SUBSCR
 | DELETE_SLICESUB
-[@@deriving show]
+[@@deriving show {with_path = false}]
 
 (* prints an array of instructions in readable format *)
 val print_instr_array : t DynArray.t -> unit
