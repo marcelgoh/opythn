@@ -67,7 +67,7 @@ type t =
 | DELETE_LOCAL of (* depth : *) int * (* name : *) string
 | DELETE_GLOBAL of (* name : *) string
 | DELETE_NAME of (* name : *) string
-| DELETE_ATTR of (* name : *) string
+| DELETE_ATTR of (* name : *) string  (* del TOS.name *)
 | DELETE_SUBSCR
 | DELETE_SLICESUB
 [@@deriving show {with_path = false}]

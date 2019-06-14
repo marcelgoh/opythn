@@ -71,6 +71,27 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
   (* loop over instructions -- changed to a while-loop because OCaml couldn't perform TCO *)
   let loop () : Py_val.t =
     let idx = ref 0 in
+    (* get positive index if i in list of length n *)
+    let pos_idx idx n =
+      let ret_val = if idx < 0 then idx + n else idx in
+      if ret_val < 0 || ret_val >= n then
+        (* also checks bounds *)
+        raise (Bound_error idx)
+      else ret_val
+    in
+    let subscr_get_idx i n =
+      (* converts to positive index *)
+      let ret_val = if i < 0 then i + n else i in
+      if ret_val < 0 || ret_val >= n then
+        (* also checks bounds *)
+        raise (Bound_error i)
+      else ret_val
+    in
+    (* get the sub{string, list} length given two indices and list length n *)
+    let sub_len i j n =
+      let j' = pos_idx j n in
+      if i > j' then 0 else j' - i
+    in
     try (
       while !idx < D.length c do
         let next = ref (!idx + 1) in
@@ -438,24 +459,15 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
          | SUBSCR ->
              let tos = s_pop () in    (* TOS <- TOS1[TOS] *)
              let tos1 = s_pop () in
-             let get_idx n =
-               (* converts to positive index *)
-               let i = as_int tos in
-               let ret_val = if i < 0 then i + n else i in
-               if ret_val < 0 || ret_val >= n then
-                 (* also checks bounds *)
-                 raise (Bound_error i)
-               else ret_val
-             in
              (match tos1 with
                 Str s ->
-                  let idx = get_idx (String.length s) in
+                  let idx = subscr_get_idx (as_int tos) (String.length s) in
                   s_push (Str (String.make 1 s.[idx]))
               | List darr ->
-                  let idx = get_idx (D.length darr) in
+                  let idx = subscr_get_idx (as_int tos) (D.length darr) in
                   s_push (D.get darr idx)
               | Tuple arr ->
-                  let idx = get_idx (Array.length arr) in
+                  let idx = subscr_get_idx (as_int tos) (Array.length arr) in
                   s_push arr.(idx)
               | Dict htbl ->
                   (match H.find_opt htbl tos with
@@ -468,38 +480,75 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
              let tos = s_pop () in     (* TOS <- TOS2[TOS1:TOS] *)
              let tos1 = s_pop () in
              let tos2 = s_pop () in
-             let pos_idx idx n =
-               let ret_val = if idx < 0 then idx + n else idx in
-               if ret_val < 0 || ret_val >= n then
-                 (* also checks bounds *)
-                 raise (Bound_error idx)
-               else ret_val
-             in
-             let sub_len i n =
-               let j = pos_idx (as_int tos) n in
-               if i > j then 0 else j - i
-             in
              (match tos2 with
                 Str s ->
                   let n = String.length s in
                   let i = pos_idx (as_int tos1) n in
-                  s_push (Str (String.sub s i (sub_len i n)))
+                  s_push (Str (String.sub s i (sub_len i (as_int tos) n)))
               | List darr ->
                   let n = D.length darr in
                   let i = pos_idx (as_int tos1) n in
-                  s_push (List (D.sub darr i (sub_len i n)))
+                  s_push (List (D.sub darr i (sub_len i (as_int tos) n)))
               | Tuple arr ->
                   let n = Array.length arr in
                   let i = pos_idx (as_int tos1) n in
-                  s_push (Tuple (Array.sub arr i (sub_len i n)))
+                  s_push (Tuple (Array.sub arr i (sub_len i (as_int tos) n)))
               | _ -> raise (Runtime_error "Object not slice-subscriptable: SLICESUB"))
-         | DELETE_LOCAL _ (* (n, id) *)
-         | DELETE_GLOBAL _ (* id *)
-         | DELETE_NAME _ (* id *)
-         | DELETE_ATTR _ (* id *)
-         | DELETE_SUBSCR
+         | DELETE_LOCAL (n, id) ->
+             (match List.nth_opt envr.locals n with
+                None -> raise (Runtime_error "Tried to access non-existent scope: DELETE_LOCAL")
+              | Some scope -> H.remove scope id)
+         (* del operations will not give warning if nothing is being deleted *)
+         | DELETE_GLOBAL id ->
+             H.remove (List.hd envr.globals) id
+         | DELETE_NAME id ->
+             (* delete from innermost scope *)
+             (match envr.cls with
+                Some c ->
+                  H.remove c.attrs id
+              | None ->
+                  (match envr.locals with
+                     (s :: _) -> H.remove s id
+                   | [] -> H.remove (List.hd envr.globals) id))
+         | DELETE_ATTR id ->
+             let tos = s_pop () in
+             (match tos with
+                Obj obj -> H.remove obj.fields id
+              | Class cls -> H.remove cls.attrs id
+              | _ -> raise (Runtime_error
+                              (sprintf "Cannot set attribute `%s`: DELETE_ATTR" id)))
+         | DELETE_SUBSCR ->
+             let tos = s_pop () in    (* del TOS1[TOS] *)
+             let tos1 = s_pop () in
+             (match tos1 with
+                Str s ->
+                  raise (Runtime_error "Strings do not support item deletion: DELETE_SUBSCR")
+              | List darr ->
+                  let idx = subscr_get_idx (as_int tos) (D.length darr) in
+                  D.delete darr idx
+              | Tuple arr ->
+                  raise (Runtime_error "Tuples do not support item deletion: DELETE_SUBSCR")
+              | Dict htbl ->
+                  (match H.find_opt htbl tos with
+                     Some v -> H.remove htbl tos
+                   | None ->
+                       raise (Runtime_error "Key not found: DELETE_SUBSCR"))
+              | _ ->
+                  raise (Runtime_error "Object not subscriptable: DELETE_SUBSCR"))
          | DELETE_SLICESUB ->
-             printf "Instruction not yet implemented.\n";
+             let tos = s_pop () in     (* del TOS2[TOS1:TOS] *)
+             let tos1 = s_pop () in
+             let tos2 = s_pop () in
+             (match tos2 with
+                Str s ->
+                  raise (Runtime_error "Strings do not support item deletion: DELETE_SLICESUB")
+              | List darr ->
+                  let n = D.length darr in
+                  let i = pos_idx (as_int tos1) n in
+                  D.delete_range darr i (sub_len i (as_int tos) n)
+              | Tuple arr ->
+                  raise (Runtime_error "Tuples do not support item deletion: DELETE_SLICESUB")
+              | _ -> raise (Runtime_error "Object not slice-subscriptable: SLICESUB"))
         );
         idx := !next
       done;

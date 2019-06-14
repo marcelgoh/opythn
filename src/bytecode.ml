@@ -434,8 +434,8 @@ let rec compile_stmts in_repl in_class stmts enclosings table =
          (match slice with
             Some j ->
               compile_and_add_expr j;
-              D.add instrs SLICESUB
-          | None -> D.add instrs SUBSCR)
+              D.add instrs DELETE_SLICESUB
+          | None -> D.add instrs DELETE_SUBSCR)
      | Del (AttrRef(obj, id)) ->
          compile_and_add_expr obj;
          D.add instrs (DELETE_ATTR id)

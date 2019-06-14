@@ -11,7 +11,7 @@ exception Built_in_error of string
 let rec print args =
   let print_in_literal pv =
     match pv with
-      Str s -> printf "\"%s\"" s
+      Str s -> printf "'%s'" s
     | _ -> print [pv]
   in
   let rec print' with_space args : unit =
