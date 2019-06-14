@@ -9,6 +9,11 @@ exception Built_in_error of string
 
 (* helper functions - not in built-in scope *)
 let rec print args =
+  let print_in_literal pv =
+    match pv with
+      Str s -> printf "\"%s\"" s
+    | _ -> print [pv]
+  in
   let rec print' with_space args : unit =
   match args with
     []      -> ()
@@ -39,24 +44,26 @@ let rec print args =
            printf "[";
            let n = D.length darr in
            for i = 0 to n - 1 do
-             print [D.get darr i];
-             if i = n - 1 then printf "]" else printf ", "
-           done
+             print_in_literal (D.get darr i);
+             if i <> n - 1 then printf ", " else ()
+           done;
+           printf "]"
        | Tuple arr ->
            printf "(";
            let n = Array.length arr in
            for i = 0 to n - 1 do
-             print [arr.(i)];
-             if i = n - 1 then printf ")" else printf ", "
-           done
+             print_in_literal arr.(i);
+             if i <> n - 1 then printf ", " else ()
+           done;
+           printf ")"
        | Dict htbl ->
            let comma = ref "" in
            let f key value =
              printf "%s" !comma;
              comma := ", ";   (* comma is only empty in the first iteration *)
-             print [key];
+             print_in_literal key;
              printf ": ";
-             print [value];
+             print_in_literal value
            in
            printf "{"; H.iter f htbl; printf "}"
        | Seq seq ->

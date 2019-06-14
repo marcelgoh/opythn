@@ -417,7 +417,7 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
              let arr = Array.make n None in
              for i = 0 to n - 1 do
                (* populate array in reverse *)
-               arr.(n - 1) <- s_pop ()
+               arr.(n - i - 1) <- s_pop ()
              done;
              s_push (Tuple arr)
          | BUILD_LIST n ->

@@ -260,11 +260,9 @@ key_datum_list:
   kv = key_datum { [kv] }
 | kv = key_datum; COMMA; rest = key_datum_list { kv :: rest }
 (* two or more comma-separated values *)
-(*
 tuple_list:
   e1 = expr; COMMA; e2 = expr { [e1; e2] }
 | e1 = expr; COMMA; tl = tuple_list { e1 :: tl }
-*)
 atom:
   v = ID { Var v }
 | i = INT { IntLit i }
@@ -273,12 +271,11 @@ atom:
 | TRUE { BoolLit true }
 | FALSE { BoolLit false }
 | NONE { None }
-(* tuples *)
-(*
+(* tuples -- must be surrounded by parentheses *)
 | LPAREN; RPAREN { TupleLit [] }
 | LPAREN; e = expr; COMMA; RPAREN { TupleLit [e] }
-| tl = tuple_list { TupleLit tl }
-*)
+(* Python 3 -- | LPAREN; args = tuple_list; RPAREN { TupleLit args } *)
+| LPAREN; args = tuple_list; RPAREN { TupleLit args }
 (* literal lists *)
 | LSQUARE; args = argument_list?; RSQUARE {
     match args with
