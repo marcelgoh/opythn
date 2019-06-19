@@ -115,41 +115,40 @@ let is_str = function
 
 (* comparison functions *)
 let rec eq pv1 pv2 = (* uses OCaml's structural equality, usually *)
-  if is_float pv1 || is_float pv2 then
-    as_float pv1 = as_float pv2
-  else if is_int pv1 || is_int pv2 then
-         as_int pv1 = as_int pv2
-       else
-         match (pv1, pv2) with
-           (Bool x1, Bool x2) -> x1 = x2
-         | (Str x1, Str x2) -> x1 = x2
-         | (Type x1, Type x2) -> x1 = x2
-         | (List x1, List x2) -> x1 = x2
-         | (Tuple x1, Tuple x2) -> x1 = x2
-         | (Fun (s1, f1), Fun (s2, f2)) -> s1 = s2 && f1 == f2
-         (* change this when __eq()__ added *)
-         | (Obj x1, Obj x2) ->
-             (match H.find_opt x1.cls.attrs "__eq__" with
-                Some (Fun (_, f)) ->
-                  as_bool (f [Obj x1; Obj x2])
-              | _ -> false)
-         | (Class x1, Class x2) -> x1 == x2
-         (* might be sketchy, not quite what Python does *)
-         | (Seq x1, Seq x2) -> x1 == x2
-         | (None, None) -> true
-         | (Dict (x1 : (t, t) H.t), Dict (x2 : (t, t) H.t)) ->
-             (* check if all values in first list map to same values in second *)
-             let f (key : t) (value : t) (b : bool) : bool =
-               if b then (
-                 match H.find_opt x2 key with
-                   Some v -> eq v value
-                 | None -> false
-               )
-               else false
-             in
-             (* also make sure length of maps same *)
-             H.length x1 = H.length x2 && H.fold f x1 true
-         | _ -> false
+  match (pv1, pv2) with
+    (Int x1, Int x2) -> x1 = x2
+  | (Float x1, Float x2) -> compare x1 x2 = 0
+  | (Float x1, Int x2) -> compare x1 (float_of_int x2) = 0
+  | (Int x1, Float x2) -> compare (float_of_int x1) x2 = 0
+  | (Bool x1, Bool x2) -> x1 = x2
+  | (Str x1, Str x2) -> x1 = x2
+  | (Type x1, Type x2) -> x1 = x2
+  | (List x1, List x2) -> x1 = x2
+  | (Tuple x1, Tuple x2) -> x1 = x2
+  | (Fun (s1, f1), Fun (s2, f2)) -> s1 = s2 && f1 == f2
+  (* change this when __eq()__ added *)
+  | (Obj x1, Obj x2) ->
+      (match H.find_opt x1.cls.attrs "__eq__" with
+         Some (Fun (_, f)) ->
+           as_bool (f [Obj x1; Obj x2])
+       | _ -> false)
+  | (Class x1, Class x2) -> x1 == x2
+  (* might be sketchy, not quite what Python does *)
+  | (Seq x1, Seq x2) -> x1 == x2
+  | (None, None) -> true
+  | (Dict (x1 : (t, t) H.t), Dict (x2 : (t, t) H.t)) ->
+      (* check if all values in first list map to same values in second *)
+      let f (key : t) (value : t) (b : bool) : bool =
+        if b then (
+          match H.find_opt x2 key with
+            Some v -> eq v value
+          | None -> false
+        )
+        else false
+      in
+      (* also make sure length of maps same *)
+      H.length x1 = H.length x2 && H.fold f x1 true
+  | _ -> false
 
 let is pv1 pv2 = (* uses OCaml's physical equality *)
   if is_float pv1 || is_float pv2 then

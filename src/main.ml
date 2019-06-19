@@ -48,26 +48,41 @@ let print_lex buffer =
   done;
   printf "%s" (Token.show !tok)
 
+(* return printable string of offending line/column *)
+let get_line_col buffer =
+  let colon_r = Str.regexp_string ":" in
+  let str = Lexer.print_position buffer in
+  let line_label = Str.replace_first colon_r "line " str in
+  Str.replace_first colon_r ", column " line_label
+
+
 (* file input *)
 let from_file opy_code =
   let buffer = ref (Lexing.from_string opy_code) in
-  if !debug then (
-    printf "************* LEXER OUTPUT *************\n";
+  try
+    if !debug then (
+      printf "************* LEXER OUTPUT *************\n";
+      Lexer.setup_file_input !buffer;
+      print_lex !buffer;
+      buffer := Lexing.from_string opy_code (* reset buffer *)
+    );
     Lexer.setup_file_input !buffer;
-    print_lex !buffer;
-    buffer := Lexing.from_string opy_code (* reset buffer *)
-  );
-  Lexer.setup_file_input !buffer;
-  let tree = Parser.input Lexer.read !buffer in
-  let instrs = Bytecode.compile_prog false tree in
-  if !debug then (
-    printf "************ PARSER OUTPUT *************\n";
-    printf "%s\n" (Ast.show tree);
-    printf "*************** BYTECODE ***************\n";
-    Bytecode.print_asm instrs;
-    printf "************ CONSOLE OUTPUT ************\n"
-  );
-  envr := Interpreter.interpret instrs !envr
+    let tree = Parser.input Lexer.read !buffer in
+    let instrs = Bytecode.compile_prog false tree in
+    if !debug then (
+      printf "************ PARSER OUTPUT *************\n";
+      printf "%s\n" (Ast.show tree);
+      printf "*************** BYTECODE ***************\n";
+      Bytecode.print_asm instrs;
+      printf "************ CONSOLE OUTPUT ************\n"
+    );
+    envr := Interpreter.interpret instrs !envr
+  with
+    Parser.Error ->
+      printf "Syntax error at %s.\n" (get_line_col !buffer)
+  | e ->
+      let msg = Printexc.to_string e in
+      printf "Error: %s.\n" msg
 
 (* quit repl *)
 let quit _ =
@@ -97,13 +112,13 @@ let rec repl () =
     Parse_errors.Eof_found ->
       quit ()
   | Parser.Error ->
-      printf "%s: Syntax error.\n" (Lexer.print_position buffer);
+      printf "Syntax error at %s.\n" (get_line_col buffer);
       repl ()
   | Sys.Break ->
       raise Sys.Break
   | e ->
       let msg = Printexc.to_string e in
-      printf "Error: %s\n" msg;
+      printf "Error: %s.\n" msg;
       repl ()
 
 (* currently prints lex output only *)

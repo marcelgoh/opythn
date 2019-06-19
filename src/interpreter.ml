@@ -627,7 +627,14 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
       (* default behaviour when no RETURN_VALUE is encountered is to return TOS *)
       if S.is_empty stack then Py_val.None else s_pop ()
     )
-    with Loop.Exit pv -> pv
+    with
+      Loop.Exit pv -> pv    (* break encountered *)
+    | Runtime_error s ->
+        printf "Runtime error at bytecode line %d: %s\n" !program_counter s;
+        None
+    | Py_val.Type_error ->
+        printf "Type error at bytecode line %d.\n" !program_counter;
+        None
   in
   (* start interpreting from the top of instructions *)
   loop ()
