@@ -13,6 +13,7 @@ def foo(y):
     a = x   # defined in this scope       LOCAL(0) **
     b = y   # defined in enclosing scope  LOCAL(1)
     c = z   # defined in global scope     GLOBAL  **
+
     # d = m   # not defined in any scope    GLOBAL  **
     e = n   # explicitly nonlocal         LOCAL(1)
     f = p   # explicitly global           GLOBAL

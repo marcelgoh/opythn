@@ -11,6 +11,10 @@ print(d["Knuth"], d["Von Neumann"])
 d["Von Neumann"] = "USA"
 print(d["Von Neumann"])
 
+# This doesn't pass, because order is unspecified.
+# for k in d:
+#    print(d[k])
+
 print(s[2])
 print(l[1:3][1][1][0])
 

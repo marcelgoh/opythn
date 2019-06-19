@@ -115,7 +115,14 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
              let tos1 = s_pop () in
              (try
                 (match (tos1, tos) with
-                   (Str s, Str t) -> s_push (Str (s ^ t))
+                   (Str s, Str t) ->
+                     s_push (Str (s ^ t))
+                 | (List darr1, List darr2) ->
+                     let c = D.copy darr2 in
+                     D.append c darr1;
+                     s_push (List darr1)
+                 | (Tuple arr1, Tuple arr2) ->
+                     s_push (Tuple (Array.append arr1 arr2))
                  | _              -> if is_float tos1 || is_float tos then
                                        s_push (Float ((as_float tos1) +. (as_float tos)))
                                      else
