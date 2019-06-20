@@ -387,8 +387,8 @@ let is_lower args =
       Bool !all_lower
   | _ -> raise (Built_in_error "Method expects exactly one string: ISLOWER()")
 
-(* isnumeric() *)
-let is_numeric args =
+(* isdigit() *)
+let isdigit args =
   match args with
     [(Str s1)] ->
       let all_num = ref true in
@@ -432,6 +432,6 @@ let str_methods : (string, Py_val.t) Hashtbl.t =
   H.add tbl "find" (Fun ("find", find));
   H.add tbl "isalpha" (Fun ("isalpha", is_alpha));
   H.add tbl "islower" (Fun ("islower", is_lower));
-  H.add tbl "isnumeric" (Fun ("isnumeric", is_numeric));
+  H.add tbl "isdigit" (Fun ("isdigit", isdigit));
   H.add tbl "isupper" (Fun ("isupper", is_upper));
   tbl

@@ -171,7 +171,10 @@ let rec compile_stmts in_repl in_class stmts enclosings table =
                          Some num -> H.replace nonlocals s (Local num)
                        | None ->
                            raise (Bytecode_error (sprintf "No binding for %s found" s))))
-         | Return e -> resolve_expr e
+         | Return opt ->
+             (match opt with
+                Some e -> resolve_expr e
+              | None -> ())
          | Del e -> resolve_expr e
          (* we don't resolve inside function or class declarations *)
          | Funcdef(name, _, _) ->
@@ -230,10 +233,10 @@ let rec compile_stmts in_repl in_class stmts enclosings table =
       search
   in
   (* convert an expression to bytecode and add instructions to array *)
-  let rec compile_expr (lambdas : string list list) (e : Ast.expr) : code =
+  let rec compile_expr offset (lambdas : string list list) (e : Ast.expr) : code =
     (* local instruction array for compiling expressions *)
     let expr_instrs = D.create () in
-    let compile_and_add_expr expr = D.append (compile_expr lambdas expr) expr_instrs in
+    let compile_and_add_expr expr = D.append (compile_expr offset lambdas expr) expr_instrs in
     (* pattern match expression and compile accordingly *)
     (match e with
        Var id ->
@@ -254,7 +257,7 @@ let rec compile_stmts in_repl in_class stmts enclosings table =
               let pop_index = D.length expr_instrs in
               D.add expr_instrs (JUMP_IF_FALSE_OR_POP (-1)); (* dummy *)
               compile_and_add_expr e2;
-              D.set expr_instrs pop_index (JUMP_IF_FALSE_OR_POP (D.length expr_instrs)) (* backfill *)
+              D.set expr_instrs pop_index (JUMP_IF_FALSE_OR_POP (D.length expr_instrs + offset)) (* backfill *)
           | _ -> raise (Bytecode_error "Not enough arguments: AND"))
      | Op (Or, args) ->
          (match args with
@@ -263,7 +266,7 @@ let rec compile_stmts in_repl in_class stmts enclosings table =
               let pop_index = D.length expr_instrs in
               D.add expr_instrs (JUMP_IF_TRUE_OR_POP (-1)); (* dummy *)
               compile_and_add_expr e2;
-              D.set expr_instrs pop_index (JUMP_IF_TRUE_OR_POP (D.length expr_instrs)) (* backfill *)
+              D.set expr_instrs pop_index (JUMP_IF_TRUE_OR_POP (D.length expr_instrs + offset)) (* backfill *)
           | _ -> raise (Bytecode_error "Not enough arguments: OR"))
      | Op (o, args) ->
          List.iter compile_and_add_expr args;
@@ -307,7 +310,7 @@ let rec compile_stmts in_repl in_class stmts enclosings table =
      | Lambda(args,b) ->
          let new_table = H.create 10 in
          List.iter (fun s -> H.replace new_table s (Local 0)) args;
-         let code_block = compile_expr (args :: lambdas) b in
+         let code_block = compile_expr 0 (args :: lambdas) b in
          D.add code_block RETURN_VALUE;
          D.add expr_instrs (MAKE_FUNCTION(args, { name = "<lambda>";
                                                   ptr = ref code_block }))
@@ -338,7 +341,7 @@ let rec compile_stmts in_repl in_class stmts enclosings table =
 
   (* convert a statement to bytecode and append instructions to instruction array *)
   let rec compile_stmt (in_loop : bool) (s : Ast.stmt) : unit =
-    let compile_and_add_expr expr = D.append (compile_expr [] expr) instrs in
+    let compile_and_add_expr expr = D.append (compile_expr (D.length instrs) [] expr) instrs in
     let get_store_instr id : Instr.t =
       if in_class then
         STORE_NAME id
@@ -431,8 +434,11 @@ let rec compile_stmts in_repl in_class stmts enclosings table =
          D.add instrs (MAKE_FUNCTION (args, { name = name;
                                               ptr = ref code_block }));
          D.add instrs (get_store_instr name)
-     | Return e ->
-         compile_and_add_expr e;
+     | Return opt ->
+         (match opt with
+            Some e -> compile_and_add_expr e
+          | None -> D.add instrs (LOAD_CONST None)
+         );
          D.add instrs RETURN_VALUE
      | Del (Var id) ->
          (match get_load_instr [] (* not in lambda *) id with

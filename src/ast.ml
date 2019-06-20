@@ -36,10 +36,10 @@ type stmt =
 | While of expr * stmt list
 | For of expr * expr * stmt list
 | Funcdef of string * string list * stmt list
-| Global of string     (* one declaration at a time *)
+| Global of string      (* one declaration at a time *)
 | Nonlocal of string
-| Return of expr       (* return only one expression *)
-| Del of expr          (* delete only one expression *)
+| Return of expr option (* return one or zero expressions *)
+| Del of expr           (* delete only one expression *)
 | Classdef of string * string option * stmt list
 | Pass
 | Break

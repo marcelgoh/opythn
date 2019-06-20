@@ -310,7 +310,7 @@ funcdef:
 del_stmt:
   DEL; e = expr { Del e }
 return_stmt:
-  RETURN; e = expr { Return e }
+  RETURN; e = assignable_expr? { Return e }
 global_stmt:
   GLOBAL; i = ID { Global i }
 nonlocal_stmt:

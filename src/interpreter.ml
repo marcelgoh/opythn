@@ -72,13 +72,7 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
   let loop () : Py_val.t =
     let program_counter = ref 0 in
     (* get positive index if i in list of length n *)
-    let pos_idx idx n =
-      let ret_val = if idx < 0 then idx + n else idx in
-      if ret_val < 0 || ret_val >= n then
-        (* also checks bounds *)
-        raise (Bound_error idx)
-      else ret_val
-    in
+    let pos_idx idx n = if idx < 0 then idx + n else idx in
     let subscr_get_idx i n =
       (* converts to positive index *)
       let ret_val = if i < 0 then i + n else i in
@@ -90,6 +84,9 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
     (* get the sub{string, list} length given two indices and list length n *)
     let sub_len i j n =
       let j' = pos_idx j n in
+      if j' < 0 || j' > n then
+        raise (Bound_error j')
+      else ();
       if i > j' then 0 else j' - i
     in
     try (
@@ -484,21 +481,27 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
               | _ ->
                   raise (Runtime_error "Object not subscriptable: SUBSCR"))
          | SLICESUB ->
+             let get_i idx n =
+               let i = pos_idx idx n in
+               if i < 0 || i >= n then
+                 raise (Bound_error i)
+               else i
+             in
              let tos = s_pop () in     (* TOS <- TOS2[TOS1:TOS] *)
              let tos1 = s_pop () in
              let tos2 = s_pop () in
              (match tos2 with
                 Str s ->
                   let n = String.length s in
-                  let i = pos_idx (as_int tos1) n in
+                  let i = get_i (as_int tos1) n in
                   s_push (Str (String.sub s i (sub_len i (as_int tos) n)))
               | List darr ->
                   let n = D.length darr in
-                  let i = pos_idx (as_int tos1) n in
+                  let i = get_i (as_int tos1) n in
                   s_push (List (D.sub darr i (sub_len i (as_int tos) n)))
               | Tuple arr ->
                   let n = Array.length arr in
-                  let i = pos_idx (as_int tos1) n in
+                  let i = get_i (as_int tos1) n in
                   s_push (Tuple (Array.sub arr i (sub_len i (as_int tos) n)))
               | _ -> raise (Runtime_error "Object not slice-subscriptable: SLICESUB"))
          | DELETE_LOCAL (n, id) ->
