@@ -79,15 +79,16 @@
 %type <Ast.stmt list list> deep_suite
 %type <Ast.expr> assig_target
 %type <Ast.stmt> assignment_stmt
+%type <Ast.stmt> aug_assign
 %type <Ast.stmt> expr_stmt
 %type <Ast.expr> assignable_expr
 %type <Ast.expr> cond_expr
 %type <Ast.op> comp_op
+%type <Ast.op> bin_op_aug
 %type <Ast.expr> slice
 %type <Ast.expr> subscription
 %type <Ast.expr> expr
 %type <Ast.expr> attributeref
-%type <Ast.stmt> aug_assign
 %type <Ast.expr * Ast.expr> key_datum
 %type <(Ast.expr * Ast.expr) list> key_datum_list
 (* %type <Ast.expr list> tuple_list *)
@@ -184,6 +185,8 @@ assig_target:
 | s = subscription { s }
 assignment_stmt:
 | target = assig_target; ASSIG; e = assignable_expr { Assign(target, e) }
+aug_assign:
+  target = assig_target; o = bin_op_aug; e = expr { Assign(target, Op(o, [target; e])) }
 
 (* EXPRESSIONS *)
 expr_stmt:
@@ -202,6 +205,11 @@ comp_op:
   LT { Lt }   | GT { Gt }   | EQ { Eq } | LEQ { Leq }
 | GEQ { Geq } | NEQ { Neq } | IN { In } | NOT_IN { NotIn }
 | IS { Is }   | IS_NOT { IsNot }
+bin_op_aug: (* matches +=, -=, and friends *)
+  BW_OR_A { BwOr }     | BW_XOR_A { BwXor }  | BW_AND_A { BwAnd }
+| LSHIFT_A { LShift }  | RSHIFT_A { RShift } | PLUS_A { Plus }
+| MINUS_A { Minus }    | TIMES_A { Times }   | FP_DIV_A { FpDiv }
+| INT_DIV_A { IntDiv } | MOD_A { Mod }       | EXP_A { Exp }
 (* subscription and slicing *)
 slice:
   COLON; e = expr { e }
@@ -244,19 +252,6 @@ expr:
 (* attribute reference *)
 attributeref:
   e1 = expr; DOT; a = ID { AttrRef(e1, a) }
-aug_assign:
-  v = ID; BW_OR_A; e = expr { Assign(Var v, Op(BwOr, [Var v; e])) }
-| v = ID; BW_XOR_A; e = expr { Assign(Var v, Op(BwXor, [Var v; e])) }
-| v = ID; BW_AND_A; e = expr { Assign(Var v, Op(BwAnd, [Var v; e])) }
-| v = ID; LSHIFT_A; e = expr { Assign(Var v, Op(LShift, [Var v; e])) }
-| v = ID; RSHIFT_A; e = expr { Assign(Var v, Op(RShift, [Var v; e])) }
-| v = ID; PLUS_A; e = expr { Assign(Var v, Op(Plus, [Var v; e])) }
-| v = ID; MINUS_A; e = expr { Assign(Var v, Op(Minus, [Var v; e])) }
-| v = ID; TIMES_A; e = expr { Assign(Var v, Op(Times, [Var v; e])) }
-| v = ID; FP_DIV_A; e = expr { Assign(Var v, Op(FpDiv, [Var v; e])) }
-| v = ID; INT_DIV_A; e = expr { Assign(Var v, Op(IntDiv, [Var v; e])) }
-| v = ID; MOD_A; e = expr { Assign(Var v, Op(Mod, [Var v; e])) }
-| v = ID; EXP_A; e = expr { Assign(Var v, Op(Exp, [Var v; e])) }
 (* dict elements *)
 key_datum:
   e1 = expr; COLON; e2 = expr { (e1, e2) }

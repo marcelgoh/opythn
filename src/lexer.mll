@@ -101,10 +101,11 @@
 
 let integer = ['1'-'9'] ['0'-'9']* | '-'? '0'*
 let pointfloat = '-'? ['0'-'9']* '.' ['0'-'9']* | ['0'-'9']+ '.'
-let whitespace = [' ' '\t']+
 let newline = [' ' '\t']* ['\r' '\n']
 let id = ['a'-'z' 'A'-'Z' '_'] ['a'-'z' 'A'-'Z' '_' '0'-'9']*
 let string_char = [^ '\n' '\'' '"' '\\'] | '\\' _
+let whitespace = [' ' '\t']+
+let ws_comment = [' ' '\t']+'#'
 
 (* consumes a token of the input buffer *)
 rule read_one =
@@ -170,6 +171,8 @@ rule read_one =
                           )
                           else read_one lexbuf (* ignore when indentation equal *)
                  else read_one lexbuf } (* ignore when not at start of line *)
+  (* same behaviour when # preceded ONLY by whitespace as when # starts line *)
+  | ws_comment
   | '#'        { let blank = is_start_of_line lexbuf in
                  read_line_comment blank lexbuf }
   (* strings *)
