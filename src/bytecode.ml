@@ -257,7 +257,7 @@ let rec compile_stmts in_repl in_class stmts enclosings table =
               let pop_index = D.length expr_instrs in
               D.add expr_instrs (JUMP_IF_FALSE_OR_POP (-1)); (* dummy *)
               compile_and_add_expr e2;
-              D.set expr_instrs pop_index (JUMP_IF_FALSE_OR_POP (D.length expr_instrs + offset)) (* backfill *)
+              D.set expr_instrs pop_index (JUMP_IF_FALSE_OR_POP (D.length expr_instrs + offset + 1)) (* backfill *)
           | _ -> raise (Bytecode_error "Not enough arguments: AND"))
      | Op (Or, args) ->
          (match args with
@@ -266,7 +266,7 @@ let rec compile_stmts in_repl in_class stmts enclosings table =
               let pop_index = D.length expr_instrs in
               D.add expr_instrs (JUMP_IF_TRUE_OR_POP (-1)); (* dummy *)
               compile_and_add_expr e2;
-              D.set expr_instrs pop_index (JUMP_IF_TRUE_OR_POP (D.length expr_instrs + offset)) (* backfill *)
+              D.set expr_instrs pop_index (JUMP_IF_TRUE_OR_POP (D.length expr_instrs + offset + 1)) (* backfill *)
           | _ -> raise (Bytecode_error "Not enough arguments: OR"))
      | Op (o, args) ->
          List.iter compile_and_add_expr args;

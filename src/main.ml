@@ -76,7 +76,7 @@ let from_file opy_code =
       Bytecode.print_asm instrs;
       printf "************ CONSOLE OUTPUT ************\n"
     );
-    envr := Interpreter.interpret instrs !envr
+    envr := Interpreter.interpret instrs !envr 
   with
     Parser.Error ->
       printf "Syntax error at %s.\n" (get_line_col !buffer)

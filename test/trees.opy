@@ -13,13 +13,22 @@ class Stack:
         self.list = [item] + self.list
         self.size += 1
 
+    def peek(self):
+        if self.size <= 0:
+            print("Cannot peek at an empty stack: STACK.PEEK()")
+        else:
+            return self.list[0]
+
     def pop(self):
         if self.size <= 0:
             print("Cannot pop an empty stack: STACK.POP()")
             return None
         else:
             ret_val = self.list[0]
-            self.list = self.list[1:self.size]
+            if self.size == 1:
+                self.list = []
+            else:
+                self.list = self.list[1:self.size]
             self.size -= 1
             return ret_val
 
@@ -79,6 +88,39 @@ class SearchTree:
         else:
             self.root.insert(item)
 
+    # traverses tree and prints elements in three orders
+    def traverse(self):
+        if self.root == None:
+            print("Cannot traverse empty tree.")
+        else:
+            inorder_list = []
+            preorder_list = []
+            postorder_list = []
+
+            stack = Stack()
+            curr = self.root
+            last = None
+            while True:
+                if curr != None:
+                    preorder_list += [curr.info]
+                    stack.push(curr)
+                    curr = curr.left
+                    continue
+                if stack.is_empty():
+                    break
+                curr = stack.pop()
+                if curr.right == None or curr.right == last:
+                    postorder_list += [curr.info]
+                    last = curr
+                    curr = None
+                else:
+                    stack.push(curr)
+                    curr = curr.right
+
+            print("Preorder:", preorder_list)
+            print("Inorder:", inorder_list)
+            print("Postorder:", postorder_list)
+
 # tests
 stack = Stack()
 stack.push('a')
@@ -92,8 +134,10 @@ test_tree = SearchTree()
 test_tree.insert('k')
 test_tree.insert('v')
 test_tree.insert('b')
+test_tree.insert('a')
 test_tree.insert('j')
 test_tree.insert('q')
 test_tree.insert('g')
 test_tree.insert('k')  # should be ignored
 print(test_tree.to_string())
+# test_tree.traverse()
