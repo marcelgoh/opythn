@@ -1,5 +1,29 @@
 # Binary trees extended example
 
+# basic stack data structure
+class Stack:
+    def __init__(self):
+        self.list = []
+        self.size = 0
+
+    def is_empty(self):
+        return self.size == 0
+
+    def push(self, item):
+        self.list = [item] + self.list
+        self.size += 1
+
+    def pop(self):
+        if self.size <= 0:
+            print("Cannot pop an empty stack: STACK.POP()")
+            return None
+        else:
+            ret_val = self.list[0]
+            self.list = self.list[1:self.size]
+            self.size -= 1
+            return ret_val
+
+# binary tree node
 class Node:
     def __init__(self, info):
         self.info = info
@@ -54,6 +78,15 @@ class SearchTree:
             self.root = Node(item)
         else:
             self.root.insert(item)
+
+# tests
+stack = Stack()
+stack.push('a')
+stack.push(2)
+stack.push(False)
+print(stack.list)
+print(stack.pop())
+print(stack.list)
 
 test_tree = SearchTree()
 test_tree.insert('k')

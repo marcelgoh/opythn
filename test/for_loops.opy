@@ -24,3 +24,20 @@ for i in range(19, -23, -5):
 
 for i in range(-12, 88, 37):
     print(i)
+
+# Ackermann function
+
+def ack(x, y):
+    if x < 0 or y < 0:
+        return -1
+    elif x == 0:
+        return y + 1
+    elif y == 0:
+        return ack(x - 1, 1)
+    else:
+        return ack(x - 1, ack(x, y - 1))
+
+for i in range(4):
+    print(i)
+    for j in range(6):
+        print("ackermann(", i, ", ", j, ") = ", (ack(i, j)))
