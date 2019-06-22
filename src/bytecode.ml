@@ -304,9 +304,9 @@ let rec compile_stmts in_repl in_class stmts enclosings table =
          compile_and_add_expr e1;
          let jump_index = D.length expr_instrs in
          D.add expr_instrs (JUMP (-1)); (* dummy 2 *)
-         D.set expr_instrs pop_index (POP_JUMP_IF_FALSE (D.length expr_instrs)); (* backfill 1 *)
+         D.set expr_instrs pop_index (POP_JUMP_IF_FALSE (D.length expr_instrs + offset)); (* backfill 1 *)
          compile_and_add_expr e2;
-         D.set expr_instrs jump_index (JUMP (D.length expr_instrs)) (* backfill 2 *)
+         D.set expr_instrs jump_index (JUMP (D.length expr_instrs + offset)) (* backfill 2 *)
      | Lambda(args,b) ->
          let new_table = H.create 10 in
          List.iter (fun s -> H.replace new_table s (Local 0)) args;

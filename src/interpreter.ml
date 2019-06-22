@@ -46,7 +46,7 @@ let lookup_global envr id = lookup_scope_list envr.globals id
 let create_method f obj = (fun arglist -> f (obj :: arglist))
 
 (* run code on virtual stack machine *)
-let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
+let rec run (c : Bytecode.code) block_name (envr : env) : Py_val.t =
   (* stack machine *)
   let (stack : Py_val.t S.t) = S.create () in
   (* set to true if the next CALL_FUNCTION is a method call *)
@@ -325,9 +325,9 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
                             let new_locals = H.create 5 in
                             List.iter2 (fun param arg -> H.add new_locals param arg) params args;
                             (* run codeblock with new scope pushed onto locals list *)
-                            run !(block.ptr) { cls = None;
-                                               locals = new_locals :: envr.locals;
-                                               globals = envr.globals; }
+                            run !(block.ptr) block.name { cls = None;
+                                                          locals = new_locals :: envr.locals;
+                                                          globals = envr.globals; }
                           ))))
          | MAKE_CLASS (num_supers, block) ->
              let tos_opt = if num_supers = 1 then Some (s_pop ()) else None in
@@ -344,7 +344,7 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
                              attrs = H.create 10 }
              in
              let new_envr = { envr with cls = Some new_cls } in
-             run !(block.ptr) new_envr |> ignore;
+             run !(block.ptr) block.name new_envr |> ignore;
              s_push (Class new_cls)
          | STORE_NAME id ->
              (* bind variable in innermost scope *)
@@ -405,7 +405,8 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
                         | _ -> s_push pval)
                    | None ->
                        raise (Runtime_error
-                                (sprintf "Object has no attribute `%s`: LOAD_ATTR" id)))
+                                (sprintf "Object %s has no attribute `%s`: LOAD_ATTR"
+                                         obj.cls.name id)))
               | Class cls ->
                   (match Py_val.get_attr_opt cls id with
                      Some pval -> s_push pval;
@@ -421,7 +422,8 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
                        raise (Runtime_error
                                 (sprintf "Str object has no attribute `%s`: LOAD_ATTR" id)))
               | _ -> raise (Runtime_error
-                              (sprintf "Object has no attribute `%s`: LOAD_ATTR" id))
+                              (sprintf "Object %s has no attribute `%s`: LOAD_ATTR"
+                                       (str_of_py_val tos) id))
              );
          | BUILD_SEQ ->
              (try s_push (Seq (as_seq (s_pop ())))
@@ -633,10 +635,10 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
     with
       Loop.Exit pv -> pv    (* break encountered *)
     | Runtime_error s ->
-        printf "Runtime error at bytecode line %d: %s\n" !program_counter s;
+        printf "Runtime error at bytecode `%s` line %d: %s\n" block_name !program_counter s;
         None
     | Py_val.Type_error ->
-        printf "Type error at bytecode line %d.\n" !program_counter;
+        printf "Type error at bytecode `%s` line %d.\n" block_name !program_counter;
         None
   in
   (* start interpreting from the top of instructions *)
@@ -644,7 +646,7 @@ let rec run (c : Bytecode.code) (envr : env) : Py_val.t =
 
 (* interpret bytecode instructions, printing result when appropriate *)
 let interpret c envr =
-  let ret_val : Py_val.t = run c envr in
+  let ret_val : Py_val.t = run c "MAIN" envr in
   match ret_val with
     None -> envr
   | _ ->

@@ -67,7 +67,6 @@ let rec print args =
            in
            printf "{"; H.iter f htbl; printf "}"
        | Seq seq ->
-           (* Seq.iter (fun pv -> print [pv]) seq (* might run forever, who knows *) *)
            (match seq () with
               Seq.Nil -> printf "<Sequence (empty)>"
             | Seq.Cons(pv, _) ->
@@ -284,6 +283,71 @@ let round args =
     let factor = 10.0 ** (float_of_int d) in
     Float ((round' (n *. factor)) /. (factor))
 
+(* str() *)
+let rec str args =
+  let from_str pv =
+    match pv with
+      Str s -> s
+    | _ -> raise Type_error
+  in
+  if List.length args <> 1 then
+    raise (Built_in_error "Exactly one argument expected: STR()")
+  else
+    match List.hd args with
+      Int i -> Str (string_of_int i)
+    | Float f ->
+        let raw = sprintf "%.15g" f in
+        let str = if String.contains raw '.' then raw else raw ^ ".0" in
+        Str (sprintf "%s" (Str.global_replace (Str.regexp "\\([^.]\\)0*$") "\\1" str))
+    | Bool b -> Str (if b then "True" else "False")
+    | Str s -> Str s
+    | Fun(name, _) -> Str (sprintf "<Function `%s`>" name)
+    | Obj obj -> Str (sprintf "<`%s` object>" obj.cls.name)
+    | Class cls -> Str (sprintf "<Class `%s`>" cls.name)
+    | Type str -> Str (sprintf "<Type `%s`>" str)
+    | List darr ->
+        let out_string = ref "[" in
+        let n = D.length darr in
+        for i = 0 to n - 1 do
+          out_string := !out_string ^ from_str (str [D.get darr i]);
+          if i <> n - 1 then
+            out_string := !out_string ^ ", "
+          else ()
+        done;
+        Str (!out_string ^ "]")
+    | Tuple arr ->
+        let out_string = ref "(" in
+        let n = Array.length arr in
+        for i = 0 to n - 1 do
+          out_string := !out_string ^ from_str (str [arr.(i)]);
+          if i <> n - 1 then
+            out_string := !out_string ^ ", "
+          else ()
+        done;
+        Str (!out_string ^ ")")
+    | Dict htbl ->
+        let out_string = ref "" in
+        let comma = ref "" in
+        let f key value =
+          out_string := !out_string ^ !comma;
+          comma := ", ";   (* comma is only empty in the first iteration *)
+          out_string := !out_string ^ from_str (str [key]);
+          out_string := !out_string ^ ": ";
+          out_string := !out_string ^ from_str (str [value])
+        in
+        H.iter f htbl;
+        Str ("{" ^ !out_string ^ "}")
+    | Seq seq ->
+        (match seq () with
+           Seq.Nil -> Str "<Sequence (empty)>"
+         | Seq.Cons(pv, _) ->
+             (match str [pv] with
+                Str s ->
+                  Str ("<Sequence (" ^ s ^ ", ...)>")
+              | _ -> raise Type_error))
+    | None ->
+        Str "None"
+
 (* type() *)
 let get_type args =
   if List.length args <> 1 then
@@ -424,6 +488,7 @@ let table : (string, Py_val.t) Hashtbl.t =
   H.add tbl "print" (Fun ("print", print_ln));
   H.add tbl "range" (Fun ("range", range));
   H.add tbl "round" (Fun ("round", round));
+  H.add tbl "str" (Fun ("str", str));
   H.add tbl "type" (Fun ("type", get_type));
   tbl
 

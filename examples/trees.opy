@@ -57,11 +57,10 @@ class SearchTree:
 
 test_tree = SearchTree()
 test_tree.insert('k')
-print(test_tree.to_string())
 test_tree.insert('v')
 test_tree.insert('b')
 test_tree.insert('j')
 test_tree.insert('q')
 test_tree.insert('g')
 test_tree.insert('k')  # should be ignored
-# print(test_tree.to_string())
+print(test_tree.to_string())
