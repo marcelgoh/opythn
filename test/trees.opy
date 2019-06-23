@@ -39,6 +39,13 @@ class Node:
         self.left = None
         self.right = None
 
+    # since we won't have duplicate info fields, we can just compare info
+    def __eq__(self, other):
+        if isinstance(other, Node):
+            return self.info == other.info
+        else:
+            return False
+
     def set_left(self, new_left):
         self.left = new_left
 
@@ -100,9 +107,10 @@ class SearchTree:
             stack = Stack()
             curr = self.root
             last = None
-            while True:
+            i = 0
+            while i < 10:
                 if curr != None:
-                    preorder_list += [curr.info]
+                    preorder_list = preorder_list + [curr.info]
                     stack.push(curr)
                     curr = curr.left
                     continue
@@ -110,12 +118,16 @@ class SearchTree:
                     break
                 curr = stack.pop()
                 if curr.right == None or curr.right == last:
+                    if curr.right != last or last == None:
+                        inorder_list += [curr.info]
                     postorder_list += [curr.info]
                     last = curr
                     curr = None
                 else:
+                    inorder_list += [curr.info]
                     stack.push(curr)
                     curr = curr.right
+                i += 1
 
             print("Preorder:", preorder_list)
             print("Inorder:", inorder_list)
@@ -135,9 +147,10 @@ test_tree.insert('k')
 test_tree.insert('v')
 test_tree.insert('b')
 test_tree.insert('a')
+test_tree.insert('z')
 test_tree.insert('j')
 test_tree.insert('q')
 test_tree.insert('g')
 test_tree.insert('k')  # should be ignored
 print(test_tree.to_string())
-# test_tree.traverse()
+test_tree.traverse()
