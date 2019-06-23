@@ -79,6 +79,16 @@ class Node:
             else:
                 self.right.insert(new)
 
+    def search(self, item):
+        if type(item) != type(self.info):
+            return False
+        if item == self.info:
+            return True
+        elif item < self.info:
+            return self.left != None and self.left.search(item)
+        else:
+            return self.right != None and self.right.search(item)
+
 
 # creates a binary search tree (requires that elements be comparable)
 class SearchTree:
@@ -95,6 +105,10 @@ class SearchTree:
         else:
             self.root.insert(item)
 
+    # returns True if item is in tree, False otherwise
+    def search(self, item):
+        return self.root != None and self.root.search(item)
+
     # traverses tree and prints elements in three orders
     def traverse(self):
         if self.root == None:
@@ -108,7 +122,7 @@ class SearchTree:
             curr = self.root
             last = None
             i = 0
-            while i < 10:
+            while True:
                 if curr != None:
                     preorder_list = preorder_list + [curr.info]
                     stack.push(curr)
@@ -154,3 +168,7 @@ test_tree.insert('g')
 test_tree.insert('k')  # should be ignored
 print(test_tree.to_string())
 test_tree.traverse()
+print(test_tree.search('c'))
+print(test_tree.search('g'))
+print(test_tree.search(None))
+

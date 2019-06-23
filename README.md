@@ -20,7 +20,7 @@ Once compiled, OPythn can be started using commands of the format `./main (optio
 ```
 +----------------------------------------------+
 |            OPYTHN INTERACTIVE MODE           |
-|   Author: Marcel Goh (Release: 23.05.2019)   |
+|   Author: Marcel Goh (Release: 23.VI.2019)   |
 |          Type "Ctrl-C" for options.          |
 +----------------------------------------------+
 ]=>
@@ -43,5 +43,7 @@ Created by Marcel Goh under the supervision of Adam Dingle at the Faculty of Mat
 + Copenhagen, Denmark
 + Berlin, Germany
 + Budapest, Hungary
++ Dubrovnik, Croatia
++ Kotor, Montenegro
 
 Inconsolata font under SIL Open Font License
