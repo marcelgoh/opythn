@@ -7,7 +7,7 @@ module H = Hashtbl
 
 exception Built_in_error of string
 
-(* helper functions - not in built-in scope *)
+(** helper functions - not in built-in scope **)
 let rec print args =
   let print_in_literal pv =
     match pv with
@@ -79,7 +79,7 @@ let rec print args =
       print' true pvs in
   print' false args
 
-(* all of the following functions are of type Py_val.t list -> Py_val.t *)
+(** all of the following functions are of type Py_val.t list -> Py_val.t **)
 
 (* abs() *)
 let abs args =
@@ -368,7 +368,7 @@ let get_type args =
     | Seq _   -> Type "sequence"
     | None    -> Type "NoneType"
 
-(* these functions rely on type() *)
+(** these functions rely on type() **)
 
 (* issubclass() *)
 let rec issubclass args =
@@ -414,7 +414,7 @@ let isinstance args =
   | _ ->
       raise (Built_in_error "Exactly two arguments expected: ISINSTANCE()")
 
-(* string methods *)
+(** string methods **)
 
 (* find() *)
 let find args =
@@ -469,6 +469,39 @@ let is_upper args =
       Bool !all_upper
   | _ -> raise (Built_in_error "Method expects exactly one string: ISUPPER()")
 
+(** dict methods **)
+let clear args =
+  match args with
+    [Dict htbl] ->
+      H.reset htbl;
+      None
+  | _ -> raise (Built_in_error "Method expects exactly one dict: CLEAR()")
+
+let items args =
+  match args with
+    [Dict htbl] ->
+      let darr = D.create () in
+      H.iter (fun k v -> D.add darr (Tuple [| k; v |])) htbl;
+      List darr
+  | _ -> raise (Built_in_error "Method expects exactly one dict: ITEMS()")
+
+let keys args =
+  match args with
+    [Dict htbl] ->
+      let darr = D.create () in
+      H.iter (fun k v -> D.add darr k) htbl;
+      List darr
+  | _ -> raise (Built_in_error "Method expects exactly one dict: KEYS()")
+
+let values args =
+  match args with
+    [Dict htbl] ->
+      let darr = D.create () in
+      H.iter (fun k v -> D.add darr v) htbl;
+      List darr
+  | _ -> raise (Built_in_error "Method expects exactly one dict: VALUES()")
+
+
 (* built-in scope *)
 let table : (string, Py_val.t) Hashtbl.t =
   let tbl = H.create 33 in
@@ -499,4 +532,12 @@ let str_methods : (string, Py_val.t) Hashtbl.t =
   H.add tbl "islower" (Fun ("islower", is_lower));
   H.add tbl "isdigit" (Fun ("isdigit", isdigit));
   H.add tbl "isupper" (Fun ("isupper", is_upper));
+  tbl
+
+let dict_methods : (string, Py_val.t) Hashtbl.t =
+  let tbl = H.create 10 in
+  H.add tbl "clear" (Fun ("clear", clear));
+  H.add tbl "items" (Fun ("items", items));
+  H.add tbl "keys" (Fun ("keys", keys));
+  H.add tbl "values" (Fun ("values", values));
   tbl

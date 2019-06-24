@@ -11,9 +11,16 @@ print(d["Knuth"], d["Von Neumann"])
 d["Von Neumann"] = "USA"
 print(d["Von Neumann"])
 
-# This doesn't pass, because order is unspecified.
+# These don't pass, because order is unspecified.
+# Furthermore, keys(), items(), and values() return bare lists in OPythn
+#
 # for k in d:
 #    print(d[k])
+# print(d.keys())
+# print(d.values())
+# print(d.items())
+# d.clear()
+# print(d.items())
 
 print(s[2])
 print(l[1:3][1][1][0])

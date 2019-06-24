@@ -421,6 +421,14 @@ let rec run (c : Bytecode.code) block_name (envr : env) : Py_val.t =
                    | _ ->
                        raise (Runtime_error
                                 (sprintf "Str object has no attribute `%s`: LOAD_ATTR" id)))
+              | Dict htbl ->
+                  (match H.find_opt Built_in.dict_methods id with
+                     Some (Fun (name, f)) ->
+                       let method_name = sprintf "built-in method %s of dict object" name in
+                       s_push (Fun (method_name, (create_method f (Dict htbl))))
+                   | _ ->
+                       raise (Runtime_error
+                                (sprintf "Dict object has no attribute `%s`: LOAD_ATTR" id)))
               | _ -> raise (Runtime_error
                               (sprintf "Object %s has no attribute `%s`: LOAD_ATTR"
                                        (str_of_py_val tos) id))
@@ -576,8 +584,7 @@ let rec run (c : Bytecode.code) block_name (envr : env) : Py_val.t =
               | Dict htbl ->
                   (match H.find_opt htbl tos with
                      Some v -> H.replace htbl tos tos2
-                   | None ->
-                       raise (Runtime_error "Key not found: STORE_SUBSCR"))
+                   | None -> H.add htbl tos tos2)
               | _ ->
                   raise (Runtime_error "Object not subscriptable: STORE_SUBSCR"))
          | STORE_SLICESUB ->
