@@ -216,7 +216,7 @@ let py_in pv1 pv2 =
        with Loop.Exit -> true)
   | (_, Tuple arr2) -> Array.exists (eq pv1) arr2
   | (_, Seq seq) -> in_seq pv1 seq
-  | (_, Dict htbl) -> in_seq pv2 (H.to_seq_keys htbl)
+  | (_, Dict htbl) -> in_seq pv1 (H.to_seq_keys htbl)
   | _ ->
       raise Type_error (* not iterable *)
 

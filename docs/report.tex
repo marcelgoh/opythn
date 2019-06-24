@@ -45,7 +45,7 @@
 
 % INTRODUCTION
 \section{Introduction}
-    The OPythn project implements a working subset of the Python programming language by means of a bytecode compiler and interpreter, written in OCaml. Users will be able to interact with OPythn via a top-level read-eval-print loop or interpret OPythn source code directly from a file. This report will consist of a specification of the interpreter and the OPythn language, followed by some details regarding the implementation techniques used.
+    The OPythn project implements a working subset of the Python programming language by means of a bytecode compiler and interpreter, written in OCaml. Users will be able to interact with OPythn via a top-level read-eval-print loop or interpret OPythn source code directly from a file. This report will consist of a specification of the interpreter and the OPythn language, followed by a brief description of the implementation.
 
 % GETTING STARTED
 \section{Getting started}
@@ -62,30 +62,29 @@
     \begin{lstlisting}
     +----------------------------------------------+
     |            OPYTHN INTERACTIVE MODE           |
-    |   Author: Marcel Goh (Release: 24.05.2019)   |
+    |   Author: Marcel Goh (Release: 24.VI.2019)   |
     |          Type "Ctrl-C" for options.          |
     +----------------------------------------------+
     ]=>
     \end{lstlisting}
     In the REPL, the user can enter OPythn statements line-by-line for the interpreter to evaluate. The REPL saves the environment between inputs. Entering \ms{Ctrl-C} interrupts the REPL and opens a menu from which the user can set options, clear the current environment, or exit the program.\\
-    \indent Another way to run OPythn source code is to enter an entire program into a plaintext editor and save it as a file with the extension \ms{.opy}. Then running \ms{./main <filename>} from the command-line interprets the code and produces the specified program behaviour. Simple examples of OPythn programs are included in the \ms{examples} folder.
+    \indent Another way to run OPythn source code is to enter an entire program into a plain-text editor and save it as a file with the extension \ms{.opy}. Then running \ms{./main <filename>} from the command-line interprets the code and produces the specified program behaviour. Simple examples of OPythn programs are included in the \ms{examples} folder.
 
 % LANGUAGE
 \section{The OPythn programming language}
-    This section describes the OPythn language. In order not to repeat too much of the Python specification, it is assumed that the reader has basic familiarity with Python.
+    This section describes the OPythn language. To avoid repeating too much of the Python specification, it is assumed that the reader has basic familiarity with Python.
     \subsection{Lexical conventions}
     The OPythn interpreter reads source code as ASCII characters, which are fed into a lexer. The following is a brief outline of the input that the interpreter expects.
     \subsubsection{Line and block structure}
-    The end of a line is represented by the \ms{NEWLINE} token. In general, simple statements cannot be split over multiple lines. However, an expression in parentheses, square brackets, or curly braces can be written over multiple lines without ending the statement. The \ms{\#} character can be used to indicate comments in source code. Any letters from \ms{\#} to the end of the line will be ignored by the lexer. A line that contains only whitespaces or comments is ignored by the lexer except during interactive evaluation, when a blank line is used to indicate the end of a multi-line statement.\\
+    The end of a line is represented by the \ms{NEWLINE} token. In general, simple statements cannot be split over multiple lines. However, an expression in parentheses, square brackets, or curly braces can be written over multiple lines without ending the statement. The \ms{\#} character can be used to indicate comments in source code. Any letters from \ms{\#} to the end of the line will be ignored by the lexer. A line that contains only whitespaces or comments is ignored by the lexer except during interactive evaluation, when a blank line is used to indicate the end of a multi-line statement.
     \subsubsection{Keywords and identifiers}
     The following are OPythn keywords and cannot be used in ordinary identifiers:
     \begin{center}
         \begin{tabular}{cccccc}
             \ms{True} & \ms{False} & \ms{None} & \ms{and} & \ms{or} & \ms{not}\\
             \ms{if} & \ms{elif} & \ms{else} & \ms{for} & \ms{in} & \ms{while}\\
-            \ms{break} & \ms{continue} & \ms{class} & \ms{is} & \ms{del} & \ms{import}\\
-            \ms{in} & \ms{from} & \ms{as} &\ms{global} & \ms{nonlocal} & \ms{lambda}\\
-            \ms{def} & \ms{return} & \ms{class} & \ms{pass} &&
+            \ms{break} & \ms{continue} & \ms{class} & \ms{is} & \ms{del} & \ms{pass}\\
+            \ms{in} & \ms{def} &\ms{global} & \ms{nonlocal} & \ms{lambda} &
     \end{tabular}
     \end{center}
     Any string that is not a keyword and contains uppercase and lowercase letters, underscores, and (except for the first character) numbers is a valid identifier. Case is significant. Some names are reserved for use by OPythn's standard library functions, which are further described in Section 3.2.7.
@@ -101,10 +100,10 @@
 
 % LANGUAGE
     \subsection{Language}
-    The core of OPythn is designed to be lightweight and minimal. Basic types and operations, control structures, and elementary data structures are included, while more complex Python constructions, such as list comprehensions, generators, and coroutines are omitted.
+    The core of OPythn is designed to be lightweight and minimal. Basic types and operations, control structures, and elementary data structures are included, while more complex Python constructions, such as comprehensions, generators, and coroutines are omitted.
     \subsubsection{Simple and compound types}
     Every value in OPythn is of a certain type. There are four primitive types (\ms{int}, \ms{float}, \ms{str}, and \ms{bool}) and all of them are immutable. Integers are represented with 63 bits and can range between -4,611,686,018,427,387,904 and 4,611,686,018,427,387,903 inclusive. Strings contain 8-bit characters.\\
-    \indent OPythn has three compound types: \ms{list}, \ms{dict}, and \ms{tuple}. Of these, only tuples are immutable. Lists are zero-indexed and accessing an element via its index takes constant time. Dictionaries support values of different types, with the restriction that keys must be of an primitive type or \ms{NoneType}. For example, \ms{d = \{2: 'bonjour', False: 3.3\}} is a valid OPythn dictionary.
+    \indent OPythn has three compound types: \ms{list}, \ms{dict}, and \ms{tuple}. Of these, only tuples are immutable. Lists are zero-indexed and accessing an element via its index takes constant time. Dictionaries support values of different types. For example, \ms{d = \{2: 'bonjour', False: 3.3\}} is a valid OPythn dictionary.
    
     \subsubsection{Numeric and boolean operations}
     Ordinary arithmetic operators for addition, multiplication, subtraction, division, modulus, and exponentiation are supported between types \ms{int} and \ms{float}. When performing integer division, OPythn takes the floor of the quotient, so \ms{-13 // 5} gives \ms{-3}, and the modulus operator always gives a positive result, so \ms{-13 \% 5} returns \ms{2}.\\
@@ -113,28 +112,22 @@
     \subsubsection{String operations}
     The following useful methods are defined on strings, along with all of the methods on sequence types described in the following subsection.
     \begin{center}
-        \begin{tabular}{ccccccc}
-            \ms{find()} & \ms{isalpha()} & \ms{isnumeric()} & \ms{lower()} & \ms{split()} & \ms{strip()} & \ms{upper()}\\
+        \begin{tabular}{ccccc}
+            \ms{find()} & \ms{isalpha()} & \ms{isdigit()} & \ms{islower()} & \ms{isupper()}\\
     \end{tabular}
     \end{center}
 
     \subsubsection{Operations on sequence types}
     Strings, lists, and tuples are considered sequence types in OPythn and support a number of useful operations.
     \begin{itemize}
-        \item They can be indexed into using the postfix \ms{[ ]} operator. The expression inside must be an integer. Negative indices are allowed. For example, if \ms{x} is the list \ms{[1,2,3,4]}, then \ms{x[-2]} will return \ms{3}. Indexing into a list is the normal way to mutate a value. For example, running the expression \ms{x[1] = 'grape'} changes \ms{x} into the list \ms{[1,'grape',3,4]}. This cannot be done with tuples because they are immutable.
-        \item The number of elements in the sequence (characters, in the case of strings), can be determined using the built-in function \ms{len()}.
+        \item The element at a given index can be accessed using the postfix \ms{[ ]} operator. The expression inside must be an integer. Negative indices are allowed. For example, if \ms{x} is the list \ms{[1,2,3,4]}, then \ms{x[-2]} will return \ms{3}. Indexing into a list is the normal way to mutate a value. For example, running the expression \ms{x[1] = 'grape'} changes \ms{x} into the list \ms{[1,'grape',3,4]}. This cannot be done with tuples because they are immutable.
+        \item The number of elements in the sequence (characters, in the case of strings) can be determined using the built-in function \ms{len()}.
         \item To determine if a sequence \ms{l} contains the element \ms{e}, one may use the expression \ms{e in l} which returns the corresponding boolean. When used with a \ms{for} loop, this syntax allows the user to iterate through all the elements in a list. To see if an element does not belong to a list, one may use \ms{not in}, but of course this cannot be used to create a \ms{for} loop. The \ms{enumerate} object does not exist in OPythn.
         \item Sequence objects can be sliced using the operator \ms{:}. For example, if \ms{a = [1,True,3,'hi',5]}, then \ms{a[1:3]} would give the list \ms{[True, 3]}. This can be used with the \ms{del} keyword to delete a group of adjacent elements in a sequence. Slicing in step increments is not supported and a \ms{slice} object cannot be explicitly created.
         \item Sequences of the same type can be concatenated using the \ms{+} operator.
         \item A sequence can be explicitly converted into a list by calling \ms{list()} on it. (Calling \ms{list()} on a list returns the same list.)
     \end{itemize}
-    These functions and methods are defined on lists specifically. The special method \ms{range(i,j)} is also included, which creates a list of integers from \ms{i}, inclusive, to \ms{j}, exclusive.
-    \begin{center}
-        \begin{tabular}{cccc}
-            \ms{append()} & \ms{count()} & \ms{extend()} & \ms{index()}\\
-            \ms{insert()} & \ms{pop()} & \ms{remove()} & \ms{reverse()}\\
-    \end{tabular}
-    \end{center}
+    There are no list methods in OPythn. Because concatenation is performed in amortized constant time, the user may find it convenient to append to or extend a list by using the syntax \ms{list += [new1, new2, ...]}. In addition, OPythn supports the special method \ms{range()}, which behaves as in Python when called with one, two, or three arguments.
 
     \subsubsection{Operations on dictionaries}
     The following operations are defined on dictionaries.
@@ -155,20 +148,17 @@
 
     \subsubsection{Functions}
     OPythn supports higher-order functions and nested functions. In OPythn, functions cannot modify variables outside their scope, unless one of the keywords \ms{global} or \ms{nonlocal} is used. OPythn supports anonymous functions using the keyword \ms{lambda}. OPythn functions take positional arguments only, and specifying default values is not allowed.\\
-    \indent The following functions comprise OPythn's standard library and are included in a normal installation. Some of these functions are implemented in OPythn itself while others are implemented in OCaml.
+    \indent The following functions, implemented ``under the hood'' in OCaml, comprise OPythn's standard library and are included in a normal installation.
     \begin{center}
         \begin{tabular}{cccccc}
-            \ms{abs()} & \ms{bin()} & \ms{bool()} & \ms{chr()} & \ms{divmod()} & \ms{filter()}\\
-            \ms{float()} & \ms{hash()} & \ms{hex()} & \ms{input()} & \ms{int()} & \ms{isinstance()}\\
-            \ms{issubclass()} & \ms{iter()} & \ms{len()} & \ms{map()} & \ms{max()} & \ms{min()}\\
-            \ms{next()} & \ms{oct()} & \ms{open()} & \ms{ord()} & \ms{pow()} & \ms{print()}\\
-            \ms{range()} & \ms{repr()} & \ms{reversed()} & \ms{round()} & \ms{str()} & \ms{sorted()}\\
-            \ms{sum()} & \ms{super()} & \ms{type()} &&&
+            \ms{abs()} & \ms{bin()} & \ms{bool()} & \ms{chr()} & \ms{float()} & \ms{hex()}\\
+            \ms{input()} & \ms{isinstance()} & \ms{issubclass()} & \ms{int()} & \ms{len()} & \ms{oct()}\\
+            \ms{ord()} & \ms{print()} & \ms{range()} & \ms{round()} & \ms{str()} & \ms{type()}
     \end{tabular}
     \end{center}
 
     \subsubsection{Classes and objects}
-    OPythn is object-oriented and allows the user to define classes. Multiple inheritance are not supported. When creating a class, the following special methods can be added to indicate how the class should behave: \ms{\_\_init\_\_()}, \ms{\_\_eq\_\_()}, \ms{\_\_ne\_\_()}, \ms{\_\_str\_\_()}.\\
+    OPythn is object-oriented and allows the user to define classes. Multiple inheritance are not supported. When creating a class, the following special methods can be added to indicate how the class should behave: \ms{\_\_init\_\_()}, \ms{\_\_eq\_\_()}. The \ms{\_\_ne\_\_()} method is not supported, as \ms{e1 != e2} is always equivalent to \ms{not (e1 == e2)} in OPythn.\\
     \indent OPythn does not allow private attributes and methods. In general, an object's attributes and methods can be accessed and mutated by functions outside the class' definition. All Python values are objects, but the user is not allowed to subclass built-in types.
     \subsubsection{Error handling}
     OPythn does not include support for exceptions. When an error occurs, the program prints an error message and either terminates or returns to the REPL.
@@ -176,19 +166,19 @@
 
 % IMPLEMENTATION
 \section{Implementation}
-Both the OPythn bytecode compiler and interpreter will be implemented in OCaml. This section gives a rough overview of the process by which OPythn source code is handled and executed.
+Both the OPythn bytecode compiler and interpreter will be implemented in OCaml. This section gives a rough overview of the process by which OPythn source code is handled and executed. The modules mentioned in this section can be found in the \ms{src} folder of the OPythn repository.
     \subsection{Lexical analysis}
-    Upon reading source code, the OPythn front-end passes the data as a string to a series of functions that lex the code into tokens. The lexer will be created with the help of \texttt{ocamllex}, a program that generates a deterministic finite automaton in OCaml. This resulting lexer matches regular expressions in the string to convert chunks of characters into the correct tokens.\\
+    Upon reading source code, the OPythn front-end passes the data as a string to a series of functions that lex the code into tokens. The lexer will be created with the help of \texttt{ocamllex}, a program that generates a finite state machine in OCaml. This resulting lexer matches regular expressions in the string to convert chunks of characters into the correct tokens.\\
     \indent The lexer will produce tokens of the following OCaml datatype:
     \begin{lstlisting}[language=caml]
     type token =
-      NEWLINE | INDENT | DEDENT
-    | NAME of string  (* identifier *)
+      NEWLINE | INDENT | DEDENT | EOF
+    | ID of string  (* identifier *)
+    | INT of int
+    | FLOAT of float
+    | STR of string
     | IF | WHILE (* other keywords... *)
-    | NUMBER of string
-    | STRING of string
-    | OP of string
-    | DELIM of string
+    | (* operators and delimiters *)
     \end{lstlisting}
     \indent In OPythn, the amount of leading whitespace at the beginning of a line indicates the indentation level of the line. A tab character counts for exactly four spaces during this computation. Indentation levels of consecutive lines are used to generate \ms{INDENT} and \ms{DEDENT} tokens. This is done by means of a stack using the following algorithm, as described by the standard Python reference \cite{pythonref}.
     \begin{algorithm}
@@ -198,6 +188,12 @@ Both the OPythn bytecode compiler and interpreter will be implemented in OCaml. 
         \State $token\_list \gets$ create a new empty list
         \State $stack \gets$ create a new empty stack
         \State $stack.push(0)$
+                \algstore{indent}
+    \end{algorithmic}
+    \end{algorithm}
+    \begin{algorithm}
+    \begin{algorithmic}
+            \algrestore{indent}
         \While{there are lines to be read}
             \State $line \gets$ the current line
             \State $num\_sp \gets$ the number of leading spaces in $line$
@@ -215,138 +211,249 @@ Both the OPythn bytecode compiler and interpreter will be implemented in OCaml. 
                 \EndFor
                 \EndIf
                 \State tokenise the rest of the line and add tokens to $token\_list$
-%                \algstore{indent}
-%    \end{algorithmic}
-%    \end{algorithm}
-%    \begin{algorithm}
-%    \begin{algorithmic}
-%            \algrestore{indent}
         \EndWhile
         \State \Return{$token\_list$}
     \EndProcedure
     \end{algorithmic}
     \end{algorithm}
     \subsection{Parsing}
-    The tokens produced by the lexer is then fed into the parser, which will be implemented according to the grammar rules outlined in Section 2.3 and using \texttt{menhir}, an OCaml parser generator. The result will be an abstract syntax tree that represents the structure and semantics of the OPythn program.\\
-     \indent Typed values are represented as follows. To represent an OPythn list, we will need the \ms{DynArray} module from the \ms{extlib} library. To represent a dictionary, we use an OCaml hashtable.
-    \begin{lstlisting}[language=caml]
-    type py_val =
-      INT of int
-    | FLOAT of float
-    | STR of string
-    | BOOL of bool
-    | LIST of py_val DynArray.t
-    | DICT of (py_immut, py_val) Hashtbl.t
-    | TUPLE of py_val array
-    | FUN of (py_val list -> py_val)
-    | TYPE of ...
-    | OBJ of ...
-    | NONE
-    \end{lstlisting}
+    The tokens produced by the lexer is then fed into the parser, which will be implemented according to the grammar rules outlined in the appendix and using \texttt{menhir}, an OCaml parser generator. The result will be an abstract syntax tree that represents the structure and semantics of the OPythn program. This tree is represented in the datatypes \ms{Ast.op}, \ms{Ast.expr}, and \ms{Ast.stmt}, which represent operations, expressions, and statements respectively.
 
     \subsection{Bytecode}
-    OPythn evaluates an abstract syntax tree by generating intermediary bytecode, which is evaluated by a virtual stack machine, as in many conventional Python implementations. As an example of what this looks like, consider this simple algorithm for integer multiplication in terms of addition:
+    The abstract syntax tree is passed to the bytecode compiler, which produces instructions for a virtual stack machine, represented as the \ms{Instr.t} datatype. Some instructions, such as \ms{NOP} and \ms{BINARY\_ADD}, take no arguments, while others take one or several arguments. To resolve the scope of user-defined names, the compiler makes two passes through its input. During the first pass, every identifier is assigned a tag indicating the level at which it is defined. This allows the second pass to produce the correct \ms{STORE} and \ms{LOAD} instructions for each name.
+
+    \subsection{Virtual machine}
+    The bytecode interpreter receives as input a \ms{DynArray}\footnote{from the \ms{extlib} library} of \ms{Instr.t}. At the beginning of execution, the program counter is initialised to 0 and the stack is empty. Various hashtables hold the variable bindings of different scopes. When interpretation begins, a ``global'' hashtable is initialised to empty and a ``built-in'' hashtable contains all of the standard OPythn methods and functions. A separate list of hashtables is maintained for function closures. The head element of this list contains all local variable bindings and the subsequent hashtables contain the bindings of the enclosing scopes.\\
+    \indent During each iteration of the execution loop, the instruction at the index of the program counter is read and executed. Most instructions modify the stack in some way; a notable exception is the family of jump instructions, which modify the program counter instead. If the program counter is not explicitly set, it is incremented before the next iteration. When the program counter exceeds the bounds of the instruction array, the program halts.\\
+    \indent The stack holds typed OPythn values of the following mutually recursive datatypes, defined in the \ms{Py\_val} module. Tuples can be represented as simple arrays; however, since an OPythn list may be mutated, it is more naturally implemented as a \ms{DynArray}. To represent a dictionary, we use OCaml's \ms{Hashtbl} module. Finally, the ``sequence'' is OPythn's way of dealing with iteration and lazy lists and it is relies on OCaml's native \ms{Seq} module.
+    \begin{lstlisting}[language=caml]
+     type cls = {
+       name : string;
+       super : cls option;
+       attrs : (string, t) Hashtbl.t;
+     }
+     and obj = {
+       cls : cls;
+       fields : (string, t) Hashtbl.t;
+     }
+     and t =
+       Int of int
+     | Float of float
+     | Bool of bool
+     | Str of string
+     | Fun of string * (t list -> t)
+     | Obj of obj
+     | Class of cls
+     | Type of string
+     | List of t DynArray.t
+     | Tuple of t array
+     | Dict of (t, t) Hashtbl.t
+     | Seq of t Seq.t
+     | None
+    \end{lstlisting}
+
+    \subsection{A simple example}
+    The reader may find it enlightening to study how OPythn interprets the following snippet of code, which multiplies two integers:
     \begin{lstlisting}[language=python]
-    x = int(input('Enter the multiplicand: '))
-    y = int(input('Enter the multiplier: '))
+    x = int(input("Enter the multiplicand: "))
+    y = int(input("Enter the multiplier: "))
 
     acc = 0
     while y > 0:
+
         if y % 2 == 0:
             x *= 2
             y //= 2
         else:
             acc += x
             y -= 1
-
-    print('The product is: ', acc)
     \end{lstlisting}
-    OPythn compiled source will look largely the same, but will not be converted into bitstrings. Instead, an \texttt{instr} datatype will be used to capture the same information as CPython's two-byte instructions. A different type tag will be used for each bytecode instruction.
+    The lexer reads the input and splits it into the following tokens.
     \begin{lstlisting}[language=caml]
-        type instr =
-          LOAD_NAME of int
-        | LOAD_CONST of int
-        (* ... *)
-        | RETURN_VALUE
+    START_FILE
+    (ID "x") ASSIG (ID "int") LPAREN (ID "input") LPAREN
+        (STR "Enter the multiplicand: ") RPAREN RPAREN NEWLINE
+    (ID "y") ASSIG (ID "int") LPAREN (ID "input") LPAREN
+        (STR "Enter the multiplier: ") RPAREN RPAREN NEWLINE
+    (ID "acc") ASSIG (INT 0) NEWLINE
+    WHILE (ID "y") GT (INT 0) COLON NEWLINE
+    INDENT IF (ID "y") MOD (INT 2) EQ (INT 0) COLON NEWLINE
+    INDENT (ID "x") TIMES_A (INT 2) NEWLINE
+    (ID "y") INT_DIV_A (INT 2) NEWLINE
+    DEDENT ELSE COLON NEWLINE
+    INDENT (ID "acc") PLUS_A (ID "x") NEWLINE
+    (ID "y") MINUS_A (INT 1) NEWLINE
+    DEDENT DEDENT (ID "print") LPAREN
+        (STR "The product is:") COMMA (ID "acc") RPAREN NEWLINE
+    EOF
     \end{lstlisting}
-    The advantage of this representation is that the interpreter can easily pattern-match on instruction tags. When expressed in this way, the above bytecode would be represented as the following \texttt{instr array}.
+    Next, the parser builds an abstract syntax tree that represents the structure of the program.
     \begin{lstlisting}[language=caml]
-    [| LOAD_NAME 0;
-       LOAD_NAME 1;
-       LOAD_CONST 0;
-       CALL_FUNCTION 1;
-       CALL_FUNCTION 1;
-       STORE_NAME 2;
-       (* ... *)
-       RETURN_VALUE |]
+    [(Assign ((Var "x"),
+        (Call ((Var "int"),
+           [(Call ((Var "input"),
+            [(StrLit "Enter the multiplicand: ")]))]))
+        ));
+      (Assign ((Var "y"),
+         (Call ((Var "int"),
+            [(Call ((Var "input"),
+             [(StrLit "Enter the multiplier: ")]))]))
+         ));
+      (Assign ((Var "acc"), (IntLit 0)));
+      (While ((Op (Gt, [(Var "y"); (IntLit 0)])),
+         [(If ((Op (Eq, [(Op (Mod, [(Var "y"); (IntLit 2)]));
+                         (IntLit 0)])),
+             [(Assign ((Var "x"),
+                       (Op (Times, [(Var "x"); (IntLit 2)]))));
+               (Assign ((Var "y"),
+                        (Op (IntDiv, [(Var "y"); (IntLit 2)]))))],
+             (Some [(Assign ((Var "acc"),
+                             (Op (Plus, [(Var "acc"); (Var "x")]))));
+                     (Assign ((Var "y"),
+                              (Op (Minus, [(Var "y"); (IntLit 1)]))))])
+             ))
+           ]
+         ));
+      (Expr (Call ((Var "print"),
+             [(StrLit "The product is:"); (Var "acc")])))]
     \end{lstlisting}
-    \subsection{Virtual Machine}
-    Finally, the bytecode is interpreted by a stack-based virtual machine that produces the desired output. We can define a datatype specifically for stack items, so that any sort of data can be at the top of the stack. Then the stack can be represented as an \texttt{item list}, because we will only ever have to access the first few elements in the (linked) list. Many bytecode instructions access and manipulate the stack directly. For example, the instruction \texttt{POP\_TOP} removes the top element of the stack.\\
-    \indent Additionally, the interpreter has access to an array of names and and array of constants, both of which were created upon code generation. For example, the instruction \texttt{LOAD\_NAME 1} accesses the name array at index 1 and pushes the associated object onto the stack; in our case above, this was the function \texttt{input}. Likewise, the instruction \texttt{LOAD\_CONST 5} accesses the constant array at the index 5 and pushes its value onto the stack.\\
-    \indent Control-flow logic is implemented using the stack using certain instructions that tell the interpreter to jump to other parts of the bytecode. For example, at line 46 of the example bytecode, the top two elements on the stack are the values \texttt{0} and \texttt{y \% 2}. The \texttt{COMPARE\_OP 2} instruction checks if the top two elements of the stack are equal, and then pushes a boolean value onto the stack. The next instruction, \texttt{POP\_JUMP\_IF\_FALSE 68}, pops this boolean off the stack and jumps to line 68 if the boolean was false. Loops are implemented in a similar way. The instruction \texttt{SETUP\_LOOP} \textit{n} designates the next \textit{n} instructions as a block, and a test has to be run every loop to determine if the block should be exited via a \texttt{JUMP} instruction.\\
-    \indent The evaluation procedure is performed by a recursive function \texttt{eval : int -> item list -> int}, in a context where the instruction, name, and constant arrays are defined. The \texttt{eval} function has as its inputs a line number and the current stack, and each time it is called, it performs the appropriate stack manipulations before calling itself again with the next line to evaluate. When \texttt{eval} runs out of instructions to evaluate (i.e. reaches the last instruction in the array with no \texttt{JUMP} command), the program halts and an exit code is returned.
+    The bytecode compiler walks the tree twice, first resolving the scope of each identifier (in this example, all identifiers are either built-in or global) before producing the actual instruction array.
+    \begin{lstlisting}
+    0        LOAD_GLOBAL              "int"
+    1        LOAD_GLOBAL              "input"
+    2        LOAD_CONST               (Str "Enter the multiplicand: ")
+    3        CALL_FUNCTION            1
+    4        CALL_FUNCTION            1
+    5        STORE_GLOBAL             "x"
+    6        LOAD_GLOBAL              "int"
+    7        LOAD_GLOBAL              "input"
+    8        LOAD_CONST               (Str "Enter the multiplier: ")
+    9        CALL_FUNCTION            1
+    10       CALL_FUNCTION            1
+    11       STORE_GLOBAL             "y"
+    12       LOAD_CONST               (Int 0)
+    13       STORE_GLOBAL             "acc"
+    14       LOAD_GLOBAL              "y"
+    15       LOAD_CONST               (Int 0)
+    16       COMPARE_GT
+    17       POP_JUMP_IF_FALSE        42
+    18       LOAD_GLOBAL              "y"
+    19       LOAD_CONST               (Int 2)
+    20       BINARY_MOD
+    21       LOAD_CONST               (Int 0)
+    22       COMPARE_EQ
+    23       POP_JUMP_IF_FALSE        33
+    24       LOAD_GLOBAL              "x"
+    25       LOAD_CONST               (Int 2)
+    26       BINARY_MULT
+    27       STORE_GLOBAL             "x"
+    28       LOAD_GLOBAL              "y"
+    29       LOAD_CONST               (Int 2)
+    30       BINARY_INT_DIV
+    31       STORE_GLOBAL             "y"
+    32       JUMP                     41
+    33       LOAD_GLOBAL              "acc"
+    34       LOAD_GLOBAL              "x"
+    35       BINARY_ADD
+    36       STORE_GLOBAL             "acc"
+    37       LOAD_GLOBAL              "y"
+    38       LOAD_CONST               (Int 1)
+    39       BINARY_SUB
+    40       STORE_GLOBAL             "y"
+    41       JUMP                     14
+    42       LOAD_GLOBAL              "print"
+    43       LOAD_CONST               (Str "The product is:")
+    44       LOAD_GLOBAL              "acc"
+    45       CALL_FUNCTION            2
+    46       POP_TOP
+    47       LOAD_CONST               None
+    48       RETURN_VALUE
+    \end{lstlisting}
+    Finally, the bytecode is interpreted and the specified behaviour is produced in the terminal:
+    \begin{lstlisting}
+    Enter the multiplicand: 23
+    Enter the multiplier: 98
+    The product is: 2254
+    \end{lstlisting}
+    
     \section{Appendix}
     \subsection{Grammar}
-    This is the complete OPythn grammar specification:
-    \begin{lstlisting}[language=python]
-    # Start symbols
-    single_input: NEWLINE | simple_stmt | compound_stmt NEWLINE
-    file_input: (NEWLINE | stmt)* ENDMARKER
-
-    funcdef: 'def' NAME parameters ':' suite
-    classdef: 'class' NAME ['(' [arglist] ')'] ':' suite
-    parameters: '(' [arglist] ')'
-    vararglist: arg (',' arg)*
-    arg: NAME
-
+    This is the complete OPythn grammar specification. The structure borrows heavily from Python's grammar \cite{pythonref}. For brevity, the AST nodes that each rule produces have been omitted. These details may be found in the full working grammar, defined in \ms{src/parser.mly}.
+    \begin{lstlisting}[language=caml]
+    (* Input *)
+    input: START_FILE file_input | START_REPL repl_input
+    file_input: stmt* EOF
+    repl_input: NEWLINE | EOF | simple_stmt | compound_stmt NEWLINE
+    
+    (* Statements *)
     stmt: simple_stmt | compound_stmt
-    simple_stmt: small_stmt (';' small_stmt)* [';'] NEWLINE
-    small_stmt: (expr_stmt | del_stmt | flow_stmt | import_stmt
-                 global_stmt | nonlocal_stmt)
-    expr_stmt:
-    compound_stmt: if_stmt | while_stmt | for_stmt | funcdef |
-        classdef
-    global_stmt: 'global' NAME (',' NAME)*
-    nonlocal_stmt: 'nonlocal' NAME (',' NAME)*
+    simple_stmt: small_stmts SEMIC? NEWLINE
+    small_stmts: small_stmt | small_stmts SEMIC small_stmt
+    small_stmt:
+      expr_stmt | flow_stmt | global_stmt
+    | nonlocal_stmt | pass_stmt | del_stmt
+    flow_stmt: BREAK | CONTINUE | return_stmt
+    pass_stmt: PASS
+    compound_stmt:
+      if_stmt | while_stmt | for_stmt
+    | funcdef | classdef
+    condition: expr | cond_expr
+    else_clause: ELSE COLON suite
+    if_stmt: IF condition COLON suite elif_stmt* else_clause?
+    elif_stmt: ELIF condition COLON suite
+    while_stmt: WHILE condition COLON suite
+    for_stmt: FOR ID IN expr COLON suite
+    suite: deep_suite
+    deep_suite:
+      simple_stmt NEWLINE
+    | NEWLINE INDENT stmt+ DEDENT
+    assig_target: ID | attributeref | subscription
+    assignment_stmt: assig_target ASSIG assignable_expr
+    aug_assign: assig_target bin_op_aug expr
+    expr_stmt: expr | cond_expr | assignment_stmt | aug_assign
+    del_stmt: DEL expr
+    return_stmt: RETURN assignable_expr?
+    global_stmt: GLOBAL ID
+    nonlocal_stmt: NONLOCAL ID
+    
+    (* Expressions *)
+    assignable_expr: expr | cond_expr
+    cond_expr: expr IF expr ELSE assignable_expr
+    comp_op:
+      LT  | GT | EQ | LEQ | GEQ | NEQ 
+    | IN | NOT_IN | IS | IS_NOT
+    bin_op_aug:
+      BW_OR_A | BW_XOR_A  | BW_AND_A | LSHIFT_A {| RSHIFT_A  | PLUS_A
+    | MINUS_A | TIMES_A | FP_DIV_A | INT_DIV_A | MOD_A | EXP_A
+    slice: COLON expr
+    subscription: expr LSQUARE expr slice? RSQUARE
+    expr:
+      atom | call | attributeref | subscription
+    | expr BW_OR expr | expr BW_XOR expr | expr BW_AND expr
+    | expr LSHIFT expr | expr RSHIFT expr | expr PLUS expr
+    | expr MINUS expr | expr TIMES expr | expr FP_DIV expr
+    | expr INT_DIV expr | expr MOD expr | expr EXP expr
+    | MINUS expr | BW_COMP expr
+    | expr OR expr | expr AND expr | NOT expr
+    | expr comp_op expr | LPAREN expr RPAREN
+    | LAMBDA param_id_list COLON expr
+    attributeref: expr DOT ID
+    key_datum: expr COLON expr
+    key_datum_list: key_datum | key_datum COMMA key_datum_list
+    tuple_list: expr COMMA expr | expr COMMA tuple_list
+    atom:
+      ID | INT | FLOAT | STR | TRUE | FALSE | NONE
+    | LPAREN RPAREN | LPAREN expr COMMA RPAREN
+    | LPAREN tuple_list RPAREN | LSQUARE argument_list? RSQUARE
+    | LCURLY key_datum_list? RCURLY
+    call: expr LPAREN argument_list? RPAREN
+    argument_list: expr | expr COMMA argument_list
 
-    # Control structures
-    if_stmt: 'if' test ':' suite ('elif' test ':' suite)*
-        ['else' ':' suite]
-    while_stmt: 'while' test ':' suite ['else' ':' suite]
-    for_stmt: 'for' exprlist 'in' testlist ':' suite
-        ['else' ':' suite]
-
-    # Tests and expressions
-    test: or_test ['if' or_test 'else' test]
-    or_test: and_test ('or' and_test)*
-    and_test: not_test ('and' not_test)*
-    not_test: 'not' not_test | comparison
-    comparison: expr (comp_op expr)*
-    comp_op: '<'|'>'|'=='|'>='|'<='|'!='|'in'|'not' 'in'|
-        'is'|'is' 'not'
-    expr: xor_expr ('|' xor_expr)*
-    xor_expr: and_expr ('^' and_expr)*
-    and_expr: shift_expr ('&' shift_expr)*
-    shift_expr: arith_expr (('<<'|'>>') arith_expr)*
-    arith_expr: term (('+'|'-') term)*
-    term: factor (('*'|'/'|'%'|'//') factor)*
-    factor: ('+'|'-'|'~') factor | power
-    power: atom_expr ['**' factor]
-    atom_expr: atom trailer*
-    atom: (NAME | NUMBER | STRING+ | '...' | 'None' |
-        'True' | 'False')
-    trailer: '(' [arglist] ')' | '[' subscript ']' | . NAME
-    subscriptlist: subscript (',' subscript)* [',']
-    subscript: test | [test] ':' [test] [sliceop]
-    sliceop: ':' [test]
-    exprlist: expr (',' expr)* [',']
-    testlist: test (',' test)* [',']
-    dictorsetmaker: ( ((test ':' test | '**' expr)
-                       ((',' (test ':' test)* [','])) |
-                      (test (',' test)* [','])) )
-    arglist: argument (',' argument)* [',']
-
-    argument (test | test '=' test)
+    (* Function and class definitions *)
+    funcdef: DEF ID LPAREN param_id_list? RPAREN COLON suite
+    classdef: CLASS ID class_params? COLON suite
+    param_id_list: ID | ID COMMA param_id_list
+    class_params: LPAREN RPAREN | LPAREN ID RPAREN
     \end{lstlisting}
 
 \begin{thebibliography}{1}

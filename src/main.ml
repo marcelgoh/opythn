@@ -197,7 +197,7 @@ let rec ctrlc () =
 let print_splash () =
   printf "+----------------------------------------------+\n";
   printf "|            OPYTHN INTERACTIVE MODE           |\n";
-  printf "|   Author: Marcel Goh (Release: 23.VI.2019)   |\n";
+  printf "|   Author: Marcel Goh (Release: 24.VI.2019)   |\n";
   printf "|          Type \"Ctrl-C\" for options.          |\n";
   printf "+----------------------------------------------+\n"
 

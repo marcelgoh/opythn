@@ -29,8 +29,9 @@ _build/
 
 # LaTeX files #
 *.aux
-*.log
+*.dvi
 *.gz
+*.log
 
 # Test output
 test/*.txt

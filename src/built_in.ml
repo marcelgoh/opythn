@@ -529,8 +529,8 @@ let str_methods : (string, Py_val.t) Hashtbl.t =
   let tbl = H.create 10 in
   H.add tbl "find" (Fun ("find", find));
   H.add tbl "isalpha" (Fun ("isalpha", is_alpha));
-  H.add tbl "islower" (Fun ("islower", is_lower));
   H.add tbl "isdigit" (Fun ("isdigit", isdigit));
+  H.add tbl "islower" (Fun ("islower", is_lower));
   H.add tbl "isupper" (Fun ("isupper", is_upper));
   tbl
 

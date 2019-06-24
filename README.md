@@ -20,7 +20,7 @@ Once compiled, OPythn can be started using commands of the format `./main (optio
 ```
 +----------------------------------------------+
 |            OPYTHN INTERACTIVE MODE           |
-|   Author: Marcel Goh (Release: 23.VI.2019)   |
+|   Author: Marcel Goh (Release: 24.VI.2019)   |
 |          Type "Ctrl-C" for options.          |
 +----------------------------------------------+
 ]=>
