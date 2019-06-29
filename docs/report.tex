@@ -87,7 +87,7 @@
             \ms{in} & \ms{def} &\ms{global} & \ms{nonlocal} & \ms{lambda} &
     \end{tabular}
     \end{center}
-    Any string that is not a keyword and contains uppercase and lowercase letters, underscores, and (except for the first character) numbers is a valid identifier. Case is significant. Some names are reserved for use by OPythn's standard library functions, which are further described in Section 3.2.7.
+    Any string that is not a keyword and contains uppercase and lowercase letters, underscores, and (except for the first character) numbers is a valid identifier. Case is significant. Some names are used by OPythn's standard library functions, which are further described in Section 3.2.7.
     \subsubsection{Literals}
     Strings are enclosed in matching single quotes or double quotes. Triple-quoted strings are not supported, nor are formatted string literals. The backslash character \ms{\textbackslash} is used to escape certain characters such as tabs and newlines.\\
     \indent There are two types of numeric literals in OPythn: integers and floating-point numbers. Leading zeroes in a non-zero decimal integer are not allowed. Underscores are also not allowed in numeric literals, unlike in Python 3. Floating-point literals are supported, but must be supplied in point form and not in scientific notation.
@@ -102,7 +102,7 @@
     \subsection{Language}
     The core of OPythn is designed to be lightweight and minimal. Basic types and operations, control structures, and elementary data structures are included, while more complex Python constructions, such as comprehensions, generators, and coroutines are omitted.
     \subsubsection{Simple and compound types}
-    Every value in OPythn is of a certain type. There are four primitive types (\ms{int}, \ms{float}, \ms{str}, and \ms{bool}) and all of them are immutable. Integers are represented with 63 bits and can range between -4,611,686,018,427,387,904 and 4,611,686,018,427,387,903 inclusive. Strings contain 8-bit characters.\\
+    Every value in OPythn is of a certain type. There are four primitive types (\ms{int}, \ms{float}, \ms{str}, and \ms{bool}) and all of them are immutable. Integers are represented with 63 bits and can range between $-4,611,686,018,427,387,904$ and $4,611,686,018,427,387,903$ inclusive. Strings contain 8-bit characters.\\
     \indent OPythn has three compound types: \ms{list}, \ms{dict}, and \ms{tuple}. Of these, only tuples are immutable. Lists are zero-indexed and accessing an element via its index takes constant time. Dictionaries support values of different types. For example, \ms{d = \{2: 'bonjour', False: 3.3\}} is a valid OPythn dictionary.
    
     \subsubsection{Numeric and boolean operations}
@@ -188,12 +188,12 @@ Both the OPythn bytecode compiler and interpreter will be implemented in OCaml. 
         \State $token\_list \gets$ create a new empty list
         \State $stack \gets$ create a new empty stack
         \State $stack.push(0)$
-                \algstore{indent}
-    \end{algorithmic}
-    \end{algorithm}
-    \begin{algorithm}
-    \begin{algorithmic}
-            \algrestore{indent}
+%                \algstore{indent}
+%    \end{algorithmic}
+%    \end{algorithm}
+%    \begin{algorithm}
+%    \begin{algorithmic}
+%            \algrestore{indent}
         \While{there are lines to be read}
             \State $line \gets$ the current line
             \State $num\_sp \gets$ the number of leading spaces in $line$
