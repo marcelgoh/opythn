@@ -1,5 +1,5 @@
 # OPythn
-OPythn is a compiler and bytecode interpreter for a core subset of Python. A full report, containing the complete language specification as well as various implementation details, can be found [here](./docs/report.pdf).
+OPythn is a non-GM compiler and bytecode interpreter for a core subset of Python that contains no added colours or preservatives. A full report, containing the complete language specification as well as various implementation details, can be found [here](./docs/report.pdf).
 
 ### Installation
 
